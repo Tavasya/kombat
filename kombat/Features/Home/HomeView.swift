@@ -11,21 +11,18 @@ struct HomeView: View {
     @EnvironmentObject private var scanRepository: ScanRepository
     @EnvironmentObject private var appState: AppState
 
-    private var summary: UserSummary {
-        UserSummary(
-            displayName: appState.userEmail.split(separator: "@").first.map(String.init) ?? "there",
-            streakDays: scanRepository.streakDays,
-            totalSessions: scanRepository.scans.count,
-            averageScore: scanRepository.averageScore
-        )
+    private var displayName: String {
+        appState.userEmail.split(separator: "@").first.map(String.init) ?? "there"
     }
     private var sessions: [ScanSession] { Array(scanRepository.scans.prefix(5)) }
+
+    private let breakdownColumns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text("Welcome back, \(summary.displayName)")
+                    Text("Welcome back, \(displayName)")
                         .font(Theme.Typography.title)
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Text("Ready to sharpen your form today?")
@@ -33,7 +30,17 @@ struct HomeView: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
 
-                StreakSummaryRow(summary: summary)
+                WeekStreakCard(
+                    weekdayActivity: scanRepository.weekdayActivity,
+                    streakDays: scanRepository.streakDays
+                )
+
+                LazyVGrid(columns: breakdownColumns, spacing: Theme.Spacing.sm) {
+                    StatChip(value: "\(scanRepository.sessionsThisWeek)", label: "This Week", systemImage: "calendar")
+                    StatChip(value: "\(scanRepository.sessionsThisMonth)", label: "This Month", systemImage: "calendar.badge.clock")
+                    StatChip(value: "\(scanRepository.scans.count)", label: "All-Time", systemImage: "list.bullet")
+                    StatChip(value: "\(scanRepository.averageScore)", label: "Avg Score", systemImage: "chart.line.uptrend.xyaxis")
+                }
 
                 Button(action: onStartScan) {
                     HStack(spacing: Theme.Spacing.md) {

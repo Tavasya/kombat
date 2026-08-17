@@ -102,4 +102,28 @@ final class ScanRepository: ObservableObject {
         guard !scans.isEmpty else { return 0 }
         return scans.reduce(0) { $0 + $1.formScore } / scans.count
     }
+
+    /// Whether each day of the current calendar week (Sun...Sat, per the
+    /// device's locale) has at least one scan.
+    var weekdayActivity: [Bool] {
+        let calendar = Calendar.current
+        guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: .now)?.start else {
+            return Array(repeating: false, count: 7)
+        }
+        let activeDays = Set(scans.map { calendar.startOfDay(for: $0.date) })
+        return (0..<7).map { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: weekStart) else { return false }
+            return activeDays.contains(calendar.startOfDay(for: day))
+        }
+    }
+
+    var sessionsThisWeek: Int {
+        guard let weekInterval = Calendar.current.dateInterval(of: .weekOfYear, for: .now) else { return 0 }
+        return scans.filter { weekInterval.contains($0.date) }.count
+    }
+
+    var sessionsThisMonth: Int {
+        guard let monthInterval = Calendar.current.dateInterval(of: .month, for: .now) else { return 0 }
+        return scans.filter { monthInterval.contains($0.date) }.count
+    }
 }
