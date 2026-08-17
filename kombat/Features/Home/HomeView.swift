@@ -9,8 +9,16 @@ struct HomeView: View {
     let onStartScan: () -> Void
 
     @EnvironmentObject private var scanRepository: ScanRepository
+    @EnvironmentObject private var appState: AppState
 
-    private var summary: UserSummary { MockData.userSummary }
+    private var summary: UserSummary {
+        UserSummary(
+            displayName: appState.userEmail.split(separator: "@").first.map(String.init) ?? "there",
+            streakDays: scanRepository.streakDays,
+            totalSessions: scanRepository.scans.count,
+            averageScore: scanRepository.averageScore
+        )
+    }
     private var sessions: [ScanSession] { Array(scanRepository.scans.prefix(5)) }
 
     var body: some View {
@@ -86,4 +94,5 @@ struct HomeView: View {
         HomeView(onStartScan: {})
     }
     .environmentObject(ScanRepository())
+    .environmentObject(AppState())
 }

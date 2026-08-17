@@ -66,4 +66,28 @@ final class ScanRepository: ObservableObject {
             errorMessage = "Couldn't delete that scan. Check your connection."
         }
     }
+
+    /// Consecutive days (through today or, if today has no scan yet, through
+    /// yesterday) with at least one scan. Derived fresh from `scans` rather
+    /// than stored, so it can never drift out of sync with the actual history.
+    var streakDays: Int {
+        guard !scans.isEmpty else { return 0 }
+        let calendar = Calendar.current
+        let activeDays = Set(scans.map { calendar.startOfDay(for: $0.date) })
+        let today = calendar.startOfDay(for: .now)
+
+        var streak = 0
+        var cursor = activeDays.contains(today) ? today : calendar.date(byAdding: .day, value: -1, to: today)!
+        while activeDays.contains(cursor) {
+            streak += 1
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = previousDay
+        }
+        return streak
+    }
+
+    var averageScore: Int {
+        guard !scans.isEmpty else { return 0 }
+        return scans.reduce(0) { $0 + $1.formScore } / scans.count
+    }
 }

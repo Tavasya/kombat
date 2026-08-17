@@ -69,11 +69,4 @@ enum MockData {
         WeeklySessionCount(weekLabel: "Wk 3", count: 4),
         WeeklySessionCount(weekLabel: "Wk 4", count: 7)
     ]
-
-    static let userSummary = UserSummary(
-        displayName: "Alex",
-        streakDays: 6,
-        totalSessions: 19,
-        averageScore: 79
-    )
 }
