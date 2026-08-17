@@ -13,7 +13,7 @@ struct ScanPlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var player = AVPlayer()
     @State private var poseFrames: [PoseFrame] = []
-    @State private var currentPose: DetectedPose?
+    @State private var currentPoses: [TrackedPose] = []
     @State private var isAnalyzing = false
     @State private var timeObserver: Any?
     @State private var analysisTask: Task<Void, Never>?
@@ -21,7 +21,7 @@ struct ScanPlayerView: View {
     var body: some View {
         NavigationStack {
             VideoPlayer(player: player) {
-                PoseOverlayView(pose: currentPose)
+                PoseOverlayView(poses: currentPoses)
             }
             .ignoresSafeArea(edges: .bottom)
             .background(.black)
@@ -61,7 +61,7 @@ struct ScanPlayerView: View {
         let interval = CMTime(value: 1, timescale: 30)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
             let seconds = time.seconds
-            currentPose = poseFrames.last(where: { $0.time <= seconds + 0.05 })?.pose
+            currentPoses = poseFrames.last(where: { $0.time <= seconds + 0.05 })?.poses ?? []
         }
 
         isAnalyzing = true

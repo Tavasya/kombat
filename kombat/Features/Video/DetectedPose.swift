@@ -30,8 +30,23 @@ struct DetectedPose {
     ]
 }
 
-/// A pose pinned to a moment in the video's timeline.
+/// A pose with a stable identity across frames, so each person keeps
+/// their own skeleton color as they move.
+struct TrackedPose: Identifiable {
+    let id: Int
+    let pose: DetectedPose
+
+    /// Average of all joint positions; used to match people across frames.
+    var centroid: CGPoint {
+        let points = pose.joints.values
+        guard !points.isEmpty else { return .zero }
+        let sum = points.reduce(CGPoint.zero) { CGPoint(x: $0.x + $1.x, y: $0.y + $1.y) }
+        return CGPoint(x: sum.x / CGFloat(points.count), y: sum.y / CGFloat(points.count))
+    }
+}
+
+/// All detected poses at a moment in the video's timeline.
 struct PoseFrame {
     let time: Double
-    let pose: DetectedPose
+    let poses: [TrackedPose]
 }
