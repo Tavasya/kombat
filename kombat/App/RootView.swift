@@ -40,14 +40,6 @@ struct RootView: View {
         .environmentObject(store)
         .background(Theme.Colors.background.ignoresSafeArea())
         .onAppear { appState.validateSession() }
-        .onChange(of: store.isSubscribed) { _, subscribed in
-            Task {
-                await appState.syncSubscriptionStatus(
-                    isSubscribed: subscribed,
-                    productID: subscribed ? StoreManager.monthlyProductID : nil
-                )
-            }
-        }
     }
 }
 

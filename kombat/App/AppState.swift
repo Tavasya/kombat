@@ -56,21 +56,6 @@ final class AppState: ObservableObject {
         userEmail = email
         isLoggedIn = true
         withAnimation { flow = .pricing }
-
-        Task {
-            try? await SupabaseDatabaseClient.upsertProfile(email: email)
-        }
-    }
-
-    /// Mirrors the live StoreKit entitlement into the `profiles` table so it's visible
-    /// outside the app (e.g. in the Supabase dashboard), not used to gate access locally.
-    func syncSubscriptionStatus(isSubscribed: Bool, productID: String?) async {
-        guard isLoggedIn else { return }
-        try? await SupabaseDatabaseClient.upsertProfile(
-            email: userEmail,
-            isSubscribed: isSubscribed,
-            productID: productID
-        )
     }
 
     func signOut() {
