@@ -39,6 +39,7 @@ enum PoseAnalyzer {
         let request = VNDetectHumanBodyPoseRequest()
         var frames: [PoseFrame] = []
         var lastSampledTime = -sampleInterval
+        var tracker = PoseTracker()
 
         while let sampleBuffer = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
@@ -50,19 +51,61 @@ enum PoseAnalyzer {
             let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
             try? handler.perform([request])
 
-            guard let observation = request.results?.first,
-                  let recognized = try? observation.recognizedPoints(.all) else { continue }
-
-            var joints: [VNHumanBodyPoseObservation.JointName: CGPoint] = [:]
-            for (name, point) in recognized where point.confidence > confidenceThreshold {
-                // Vision uses a bottom-left origin; flip to top-left for drawing.
-                joints[name] = CGPoint(x: point.location.x, y: 1 - point.location.y)
+            var detected: [DetectedPose] = []
+            for observation in request.results ?? [] {
+                guard let recognized = try? observation.recognizedPoints(.all) else { continue }
+                var joints: [VNHumanBodyPoseObservation.JointName: CGPoint] = [:]
+                for (name, point) in recognized where point.confidence > confidenceThreshold {
+                    // Vision uses a bottom-left origin; flip to top-left for drawing.
+                    joints[name] = CGPoint(x: point.location.x, y: 1 - point.location.y)
+                }
+                if joints.count >= minimumJoints {
+                    detected.append(DetectedPose(joints: joints, imageAspect: imageAspect))
+                }
             }
-            if joints.count >= minimumJoints {
-                frames.append(PoseFrame(time: time, pose: DetectedPose(joints: joints, imageAspect: imageAspect)))
+            if !detected.isEmpty {
+                frames.append(PoseFrame(time: time, poses: tracker.assign(detected)))
             }
         }
         return frames
+    }
+
+    /// Gives each detected person a stable ID by matching them to the nearest
+    /// skeleton from the previous frame. Good enough for a couple of people
+    /// who aren't constantly crossing through each other.
+    private struct PoseTracker {
+        /// Normalized distance beyond which a detection is a new person,
+        /// not a moved one.
+        private static let matchThreshold: CGFloat = 0.25
+
+        private var previous: [(id: Int, centroid: CGPoint)] = []
+        private var nextID = 0
+
+        mutating func assign(_ detections: [DetectedPose]) -> [TrackedPose] {
+            var unmatched = previous
+            var tracked: [TrackedPose] = []
+
+            for pose in detections {
+                let centroid = TrackedPose(id: 0, pose: pose).centroid
+                let nearest = unmatched.enumerated().min(by: {
+                    distance($0.element.centroid, centroid) < distance($1.element.centroid, centroid)
+                })
+                if let nearest, distance(nearest.element.centroid, centroid) < Self.matchThreshold {
+                    tracked.append(TrackedPose(id: nearest.element.id, pose: pose))
+                    unmatched.remove(at: nearest.offset)
+                } else {
+                    tracked.append(TrackedPose(id: nextID, pose: pose))
+                    nextID += 1
+                }
+            }
+
+            previous = tracked.map { ($0.id, $0.centroid) }
+            return tracked
+        }
+
+        private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+            hypot(a.x - b.x, a.y - b.y)
+        }
     }
 
     private static func orientation(from transform: CGAffineTransform) -> CGImagePropertyOrientation {
