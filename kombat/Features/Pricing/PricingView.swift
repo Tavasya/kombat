@@ -7,7 +7,7 @@ import SwiftUI
 
 struct PricingView: View {
     @EnvironmentObject private var appState: AppState
-    @StateObject private var store = StoreManager()
+    @EnvironmentObject private var store: StoreManager
 
     private let features = [
         "Unlimited AI form scans",
@@ -96,27 +96,14 @@ struct PricingView: View {
                     .disabled(store.product == nil || store.isLoading)
                     .opacity(store.product == nil ? 0.5 : 1)
 
-                    HStack(spacing: Theme.Spacing.lg) {
-                        Button("Restore Purchases") {
-                            Task { await store.restorePurchases() }
-                        }
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.textSecondary)
-
-                        Button("Maybe Later") {
-                            appState.continueWithFree()
-                        }
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.textSecondary)
+                    Button("Restore Purchases") {
+                        Task { await store.restorePurchases() }
                     }
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.textSecondary)
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.bottom, Theme.Spacing.lg)
-            }
-        }
-        .onChange(of: store.isSubscribed) { _, subscribed in
-            if subscribed {
-                appState.selectPricingPlan("premium")
             }
         }
     }
@@ -131,4 +118,5 @@ struct PricingView: View {
 #Preview {
     PricingView()
         .environmentObject(AppState())
+        .environmentObject(StoreManager())
 }

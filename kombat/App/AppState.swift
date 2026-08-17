@@ -8,8 +8,8 @@ import SwiftUI
 enum AppFlow {
     case landing
     case onboarding
-    case pricing
     case auth
+    case pricing
     case main
 }
 
@@ -18,20 +18,26 @@ private let sessionKeychainKey = "session"
 @MainActor
 final class AppState: ObservableObject {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("hasSeenPricing") private var hasSeenPricing = false
-    @AppStorage("isLoggedIn") private var isLoggedIn = false
+    @AppStorage("isLoggedIn") private(set) var isLoggedIn = false
     @AppStorage("userEmail") private(set) var userEmail = ""
 
     @Published var flow: AppFlow = .landing
-    @Published var selectedPlanID: String = "free"
+
+    private var currentAccessToken: String?
+    private var currentUserID: String?
 
     init() {
         if isLoggedIn {
-            flow = .main
-        } else if hasSeenPricing {
-            flow = .auth
-        } else if hasCompletedOnboarding {
+            if let data = KeychainHelper.read(key: sessionKeychainKey),
+               let session = try? JSONDecoder().decode(AuthSession.self, from: data) {
+                currentAccessToken = session.accessToken
+                currentUserID = session.userID
+            }
+            // Whether the live screen ends up being Pricing or Main is decided by
+            // RootView based on real subscription status, not this checkpoint alone.
             flow = .pricing
+        } else if hasCompletedOnboarding {
+            flow = .auth
         }
     }
 
@@ -41,21 +47,11 @@ final class AppState: ObservableObject {
 
     func completeOnboarding() {
         hasCompletedOnboarding = true
-        withAnimation { flow = .pricing }
+        withAnimation { flow = .auth }
     }
 
     func skipOnboarding() {
         completeOnboarding()
-    }
-
-    func selectPricingPlan(_ planID: String) {
-        selectedPlanID = planID
-        hasSeenPricing = true
-        withAnimation { flow = .auth }
-    }
-
-    func continueWithFree() {
-        selectPricingPlan("free")
     }
 
     func completeAuth(session: AuthSession) {
@@ -63,13 +59,38 @@ final class AppState: ObservableObject {
             KeychainHelper.save(data, key: sessionKeychainKey)
         }
         userEmail = session.email
+        currentAccessToken = session.accessToken
+        currentUserID = session.userID
         isLoggedIn = true
-        withAnimation { flow = .main }
+        withAnimation { flow = .pricing }
+
+        Task {
+            try? await SupabaseDatabaseClient.upsertProfile(
+                accessToken: session.accessToken,
+                userID: session.userID,
+                email: session.email
+            )
+        }
+    }
+
+    /// Mirrors the live StoreKit entitlement into the `profiles` table so it's visible
+    /// outside the app (e.g. in the Supabase dashboard), not used to gate access locally.
+    func syncSubscriptionStatus(isSubscribed: Bool, productID: String?) async {
+        guard let token = currentAccessToken, let userID = currentUserID else { return }
+        try? await SupabaseDatabaseClient.upsertProfile(
+            accessToken: token,
+            userID: userID,
+            email: userEmail,
+            isSubscribed: isSubscribed,
+            productID: productID
+        )
     }
 
     func signOut() {
         KeychainHelper.delete(key: sessionKeychainKey)
         userEmail = ""
+        currentAccessToken = nil
+        currentUserID = nil
         isLoggedIn = false
         withAnimation { flow = .landing }
     }
