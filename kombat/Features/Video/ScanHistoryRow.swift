@@ -32,6 +32,12 @@ struct ScanHistoryRow: View {
 
             Spacer()
 
+            if session.videoURL != nil {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Theme.Colors.accent)
+            }
+
             Text(session.durationText)
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.Colors.textSecondary)

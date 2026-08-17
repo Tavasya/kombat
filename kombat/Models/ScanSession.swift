@@ -27,6 +27,8 @@ struct ScanSession: Identifiable {
     let category: StrikeCategory
     let formScore: Int
     let durationSeconds: Int
+    /// Present only for scans captured this session; mock history has no video.
+    var videoURL: URL? = nil
 
     var durationText: String {
         let minutes = durationSeconds / 60

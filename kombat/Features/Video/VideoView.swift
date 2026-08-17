@@ -12,6 +12,7 @@ struct VideoView: View {
     @State private var pickedVideo: PhotosPickerItem?
     @State private var isImporting = false
     @State private var importFailed = false
+    @State private var playingSession: ScanSession?
 
     var body: some View {
         ScrollView {
@@ -42,7 +43,16 @@ struct VideoView: View {
 
                     LazyVStack(spacing: Theme.Spacing.sm) {
                         ForEach(sessions) { session in
-                            ScanHistoryRow(session: session)
+                            if session.videoURL != nil {
+                                Button {
+                                    playingSession = session
+                                } label: {
+                                    ScanHistoryRow(session: session)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                ScanHistoryRow(session: session)
+                            }
                         }
                     }
                 }
@@ -55,12 +65,15 @@ struct VideoView: View {
         .onDisappear { camera.stop() }
         .onChange(of: camera.lastRecording?.id) {
             guard let recording = camera.lastRecording else { return }
-            logScan(durationSeconds: recording.durationSeconds)
+            logScan(durationSeconds: recording.durationSeconds, videoURL: recording.url)
         }
         .onChange(of: pickedVideo) {
             guard let item = pickedVideo else { return }
             pickedVideo = nil
             importVideo(from: item)
+        }
+        .sheet(item: $playingSession) { session in
+            ScanPlayerView(session: session)
         }
         .alert("Couldn't import that video", isPresented: $importFailed) {
             Button("OK", role: .cancel) {}
@@ -97,17 +110,18 @@ struct VideoView: View {
                 importFailed = true
                 return
             }
-            logScan(durationSeconds: await video.durationSeconds())
+            logScan(durationSeconds: await video.durationSeconds(), videoURL: video.url)
         }
     }
 
     /// Form analysis isn't built yet, so scans are logged with a placeholder score.
-    private func logScan(durationSeconds: Int) {
+    private func logScan(durationSeconds: Int, videoURL: URL?) {
         let session = ScanSession(
             date: .now,
             category: .combo,
             formScore: Int.random(in: 60...92),
-            durationSeconds: durationSeconds
+            durationSeconds: durationSeconds,
+            videoURL: videoURL
         )
         withAnimation { sessions.insert(session, at: 0) }
     }
