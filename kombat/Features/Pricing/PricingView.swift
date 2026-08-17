@@ -7,15 +7,17 @@ import SwiftUI
 
 struct PricingView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var selectedPlanID: String = "free"
+    @StateObject private var store = StoreManager()
 
-    private var plans: [PricingPlan] { MockData.pricingPlans }
+    private let features = [
+        "Unlimited AI form scans",
+        "Full technique breakdowns by strike type",
+        "Unlimited scan history",
+        "Progress trends over time"
+    ]
 
-    private var ctaTitle: String {
-        guard let plan = plans.first(where: { $0.id == selectedPlanID }) else {
-            return "Continue"
-        }
-        return "Continue with \(plan.name)"
+    private var priceText: String {
+        store.product?.displayPrice ?? "$19.99"
     }
 
     var body: some View {
@@ -24,38 +26,96 @@ struct PricingView: View {
 
             VStack(spacing: Theme.Spacing.lg) {
                 VStack(spacing: Theme.Spacing.xs) {
-                    Text("Choose Your Plan")
+                    Text("Unlock Kombat Premium")
                         .font(Theme.Typography.title)
                         .foregroundStyle(Theme.Colors.textPrimary)
-
-                    Text("Unlock unlimited scans and detailed form breakdowns.")
+                    Text("Try it free for 7 days, then \(priceText)/month.")
                         .font(Theme.Typography.subheadline)
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, Theme.Spacing.xl)
-                .padding(.horizontal, Theme.Spacing.lg)
 
-                ScrollView {
-                    VStack(spacing: Theme.Spacing.md) {
-                        ForEach(plans) { plan in
-                            PricingPlanCard(
-                                plan: plan,
-                                isSelected: plan.id == selectedPlanID,
-                                action: { withAnimation { selectedPlanID = plan.id } }
-                            )
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    HStack {
+                        Text("7-Day Free Trial")
+                            .font(Theme.Typography.headline)
+                            .foregroundStyle(Theme.Colors.textPrimary)
+                        Spacer()
+                        Text("THEN \(priceText)/MO")
+                            .font(Theme.Typography.eyebrow)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Theme.Colors.accentGradient, in: Capsule())
+                    }
+
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        ForEach(features, id: \.self) { feature in
+                            HStack(spacing: Theme.Spacing.xs) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Theme.Colors.accent)
+                                Text(feature)
+                                    .font(Theme.Typography.subheadline)
+                                    .foregroundStyle(Theme.Colors.textSecondary)
+                            }
                         }
                     }
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.top, Theme.Spacing.sm)
+
+                    Text("Cancel anytime before your trial ends and you won't be charged.")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                }
+                .padding(Theme.Spacing.md)
+                .cardStyle(elevated: true)
+                .padding(.horizontal, Theme.Spacing.lg)
+
+                if let errorMessage = store.errorMessage {
+                    Text(errorMessage)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.scoreLow)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.Spacing.lg)
                 }
 
-                PrimaryButton(title: ctaTitle) {
-                    appState.selectPricingPlan(selectedPlanID)
+                Spacer()
+
+                VStack(spacing: Theme.Spacing.md) {
+                    PrimaryButton(title: store.isLoading ? "Loading…" : "Start Free Trial") {
+                        subscribeTapped()
+                    }
+                    .disabled(store.product == nil || store.isLoading)
+                    .opacity(store.product == nil ? 0.5 : 1)
+
+                    HStack(spacing: Theme.Spacing.lg) {
+                        Button("Restore Purchases") {
+                            Task { await store.restorePurchases() }
+                        }
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+
+                        Button("Maybe Later") {
+                            appState.continueWithFree()
+                        }
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.bottom, Theme.Spacing.lg)
             }
+        }
+        .onChange(of: store.isSubscribed) { _, subscribed in
+            if subscribed {
+                appState.selectPricingPlan("premium")
+            }
+        }
+    }
+
+    private func subscribeTapped() {
+        Task {
+            await store.purchase()
         }
     }
 }

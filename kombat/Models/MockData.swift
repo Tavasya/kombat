@@ -24,33 +24,6 @@ enum MockData {
         )
     ]
 
-    static let pricingPlans: [PricingPlan] = [
-        PricingPlan(
-            id: "free",
-            name: "Free",
-            priceText: "$0",
-            billingPeriodText: nil,
-            features: ["3 scans per month", "Basic form scoring", "7-day history"],
-            isRecommended: false
-        ),
-        PricingPlan(
-            id: "monthly",
-            name: "Monthly",
-            priceText: "$14.99",
-            billingPeriodText: "per month",
-            features: ["Unlimited scans", "Full form breakdown", "Unlimited history", "Progress trends"],
-            isRecommended: false
-        ),
-        PricingPlan(
-            id: "annual",
-            name: "Annual",
-            priceText: "$89.99",
-            billingPeriodText: "per year — save 50%",
-            features: ["Everything in Monthly", "Priority scan processing", "Personalized drills"],
-            isRecommended: true
-        )
-    ]
-
     static let scanSessions: [ScanSession] = {
         let now = Date()
         let calendar = Calendar.current
