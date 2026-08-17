@@ -59,6 +59,7 @@ final class ScanRepository: ObservableObject {
             try await client.from("scans").delete().eq("id", value: scan.id).execute()
             if let name = scan.videoFileName {
                 ScanVideoStore.deleteVideo(named: name)
+                PoseCache.delete(for: name)
             }
             scans.removeAll { $0.id == scan.id }
         } catch {
