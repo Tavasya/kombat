@@ -29,6 +29,26 @@ struct BreakdownPanel: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
 
+                if let techniques = breakdown.techniques, !techniques.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            ForEach(techniques) { entry in
+                                VStack(spacing: 2) {
+                                    Text("\(entry.count)× \(entry.technique)")
+                                        .font(Theme.Typography.caption.weight(.semibold))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                    Text("avg \(entry.averageScore)")
+                                        .font(Theme.Typography.caption)
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                }
+                                .padding(.horizontal, Theme.Spacing.sm)
+                                .padding(.vertical, 6)
+                                .background(Theme.Colors.surface, in: Capsule())
+                            }
+                        }
+                    }
+                }
+
                 ForEach(breakdown.ruleScores) { rule in
                     HStack(spacing: Theme.Spacing.sm) {
                         Text(rule.rule)

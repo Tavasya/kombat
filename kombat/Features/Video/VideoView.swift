@@ -169,7 +169,7 @@ struct VideoView: View {
             }
             let result = FormScorer.score(frames: frames)
             await scanRepository.addScan(
-                category: .combo,
+                category: result.category,
                 formScore: result.score,
                 durationSeconds: durationSeconds,
                 breakdown: result.breakdown,

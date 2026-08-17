@@ -15,6 +15,16 @@ struct ScanBreakdown: Codable, Equatable {
     let note: String?
     let ruleScores: [RuleScore]
     let findings: [Finding]
+    /// What was thrown, per auto-classified technique. Optional because
+    /// engine-v1 rows predate classification.
+    let techniques: [TechniqueCount]?
+
+    struct TechniqueCount: Codable, Equatable, Identifiable {
+        let technique: String
+        let count: Int
+        let averageScore: Int
+        var id: String { technique }
+    }
 
     struct RuleScore: Codable, Equatable, Identifiable {
         let rule: String
