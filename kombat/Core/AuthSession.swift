@@ -9,7 +9,7 @@ struct AuthSession: Codable {
     let accessToken: String
     let refreshToken: String
     let userID: String
-    let phone: String
+    let email: String
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
@@ -19,14 +19,14 @@ struct AuthSession: Codable {
 
     enum UserKeys: String, CodingKey {
         case id
-        case phone
+        case email
     }
 
-    init(accessToken: String, refreshToken: String, userID: String, phone: String) {
+    init(accessToken: String, refreshToken: String, userID: String, email: String) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.userID = userID
-        self.phone = phone
+        self.email = email
     }
 
     init(from decoder: Decoder) throws {
@@ -35,7 +35,7 @@ struct AuthSession: Codable {
         refreshToken = try container.decode(String.self, forKey: .refreshToken)
         let userContainer = try container.nestedContainer(keyedBy: UserKeys.self, forKey: .user)
         userID = try userContainer.decode(String.self, forKey: .id)
-        phone = try userContainer.decodeIfPresent(String.self, forKey: .phone) ?? ""
+        email = try userContainer.decodeIfPresent(String.self, forKey: .email) ?? ""
     }
 
     func encode(to encoder: Encoder) throws {
@@ -44,6 +44,6 @@ struct AuthSession: Codable {
         try container.encode(refreshToken, forKey: .refreshToken)
         var userContainer = container.nestedContainer(keyedBy: UserKeys.self, forKey: .user)
         try userContainer.encode(userID, forKey: .id)
-        try userContainer.encode(phone, forKey: .phone)
+        try userContainer.encode(email, forKey: .email)
     }
 }

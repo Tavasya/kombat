@@ -20,7 +20,7 @@ final class AppState: ObservableObject {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("hasSeenPricing") private var hasSeenPricing = false
     @AppStorage("isLoggedIn") private var isLoggedIn = false
-    @AppStorage("userPhoneNumber") private(set) var userPhoneNumber = ""
+    @AppStorage("userEmail") private(set) var userEmail = ""
 
     @Published var flow: AppFlow = .landing
     @Published var selectedPlanID: String = "free"
@@ -62,14 +62,14 @@ final class AppState: ObservableObject {
         if let data = try? JSONEncoder().encode(session) {
             KeychainHelper.save(data, key: sessionKeychainKey)
         }
-        userPhoneNumber = session.phone
+        userEmail = session.email
         isLoggedIn = true
         withAnimation { flow = .main }
     }
 
     func signOut() {
         KeychainHelper.delete(key: sessionKeychainKey)
-        userPhoneNumber = ""
+        userEmail = ""
         isLoggedIn = false
         withAnimation { flow = .landing }
     }

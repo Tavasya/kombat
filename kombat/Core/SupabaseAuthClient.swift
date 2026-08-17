@@ -17,6 +17,13 @@ enum SupabaseAuthError: LocalizedError {
     }
 }
 
+enum SignUpOutcome {
+    case session(AuthSession)
+    /// Supabase's "Confirm email" setting is on, so no session is issued until the user
+    /// clicks the confirmation link Supabase emails them.
+    case confirmationRequired
+}
+
 enum SupabaseAuthClient {
     private static var session: URLSession { .shared }
 
@@ -31,16 +38,21 @@ enum SupabaseAuthClient {
         return request
     }
 
-    /// Sends a one-time SMS verification code to the given E.164 phone number.
-    static func sendOTP(phone: String) async throws {
-        let request = try makeRequest(path: "/auth/v1/otp", body: ["phone": phone])
+    /// Creates a new account. Returns `.confirmationRequired` if the project has email
+    /// confirmation enabled (the default), since Supabase won't issue a session until then.
+    static func signUp(email: String, password: String) async throws -> SignUpOutcome {
+        let request = try makeRequest(path: "/auth/v1/signup", body: ["email": email, "password": password])
         let (data, response) = try await session.data(for: request)
         try validate(data: data, response: response)
+        if let session = try? JSONDecoder().decode(AuthSession.self, from: data) {
+            return .session(session)
+        }
+        return .confirmationRequired
     }
 
-    /// Verifies the SMS code and returns the authenticated session.
-    static func verifyOTP(phone: String, code: String) async throws -> AuthSession {
-        let request = try makeRequest(path: "/auth/v1/verify", body: ["phone": phone, "token": code, "type": "sms"])
+    /// Logs in an existing, confirmed account.
+    static func signIn(email: String, password: String) async throws -> AuthSession {
+        let request = try makeRequest(path: "/auth/v1/token?grant_type=password", body: ["email": email, "password": password])
         let (data, response) = try await session.data(for: request)
         try validate(data: data, response: response)
         do {

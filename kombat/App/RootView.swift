@@ -18,7 +18,7 @@ struct RootView: View {
             case .pricing:
                 PricingView()
             case .auth:
-                AuthFlowView()
+                AuthView()
             case .main:
                 MainTabView()
             }

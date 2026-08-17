@@ -17,7 +17,7 @@ struct SettingsView: View {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 56))
                         .foregroundStyle(Theme.Colors.accent)
-                    Text(appState.userPhoneNumber.isEmpty ? "Your Account" : appState.userPhoneNumber)
+                    Text(appState.userEmail.isEmpty ? "Your Account" : appState.userEmail)
                         .font(Theme.Typography.headline)
                         .foregroundStyle(Theme.Colors.textPrimary)
                 }
