@@ -6,33 +6,80 @@
 import AVKit
 import SwiftUI
 
-/// Plays back a scan's video. The pose skeleton overlay will layer on top of this.
+/// Plays back a scan's video with the pose skeleton overlaid.
 struct ScanPlayerView: View {
     let session: ScanSession
 
     @Environment(\.dismiss) private var dismiss
     @State private var player = AVPlayer()
+    @State private var poseFrames: [PoseFrame] = []
+    @State private var currentPose: DetectedPose?
+    @State private var isAnalyzing = false
+    @State private var timeObserver: Any?
+    @State private var analysisTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
-            VideoPlayer(player: player)
-                .ignoresSafeArea(edges: .bottom)
-                .background(.black)
-                .navigationTitle(session.category.rawValue)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") { dismiss() }
+            VideoPlayer(player: player) {
+                PoseOverlayView(pose: currentPose)
+            }
+            .ignoresSafeArea(edges: .bottom)
+            .background(.black)
+            .overlay(alignment: .top) {
+                if isAnalyzing {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        ProgressView()
+                            .tint(.white)
+                        Text("Analyzing form…")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.white)
                     }
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .padding(.top, Theme.Spacing.md)
                 }
+            }
+            .navigationTitle(session.category.rawValue)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
-        .onAppear {
-            guard let url = session.videoURL else { return }
-            player.replaceCurrentItem(with: AVPlayerItem(url: url))
-            player.play()
+        .onAppear { startPlayback() }
+        .onDisappear { tearDown() }
+    }
+
+    private func startPlayback() {
+        guard let url = session.videoURL else { return }
+        player.replaceCurrentItem(with: AVPlayerItem(url: url))
+        player.play()
+
+        // Keep the skeleton in step with playback, including scrubbing.
+        let interval = CMTime(value: 1, timescale: 30)
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            let seconds = time.seconds
+            currentPose = poseFrames.last(where: { $0.time <= seconds + 0.05 })?.pose
         }
-        .onDisappear {
-            player.pause()
+
+        isAnalyzing = true
+        analysisTask = Task {
+            let frames = (try? await PoseAnalyzer.analyze(videoURL: url)) ?? []
+            if !Task.isCancelled {
+                poseFrames = frames
+                isAnalyzing = false
+            }
+        }
+    }
+
+    private func tearDown() {
+        player.pause()
+        analysisTask?.cancel()
+        if let timeObserver {
+            player.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
         }
     }
 }
