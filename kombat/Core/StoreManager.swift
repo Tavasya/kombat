@@ -59,7 +59,6 @@ final class StoreManager: ObservableObject {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
                 await transaction.finish()
-                await refreshEntitlements()
             case .userCancelled, .pending:
                 break
             @unknown default:
@@ -68,6 +67,9 @@ final class StoreManager: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+        // Always re-check, even on failure: an "already subscribed" error, for
+        // instance, means there's a real entitlement we just weren't reflecting yet.
+        await refreshEntitlements()
     }
 
     func restorePurchases() async {
