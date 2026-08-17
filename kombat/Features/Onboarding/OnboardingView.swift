@@ -5,12 +5,30 @@
 
 import SwiftUI
 
+private enum OnboardingStep {
+    case question(OnboardingQuestion)
+    case info(OnboardingPage)
+}
+
 struct OnboardingView: View {
     @EnvironmentObject private var appState: AppState
     @State private var currentPage = 0
+    @State private var answers: [UUID: String] = [:]
 
-    private var pages: [OnboardingPage] { MockData.onboardingPages }
-    private var isLastPage: Bool { currentPage == pages.count - 1 }
+    private var steps: [OnboardingStep] {
+        MockData.onboardingQuestions.map { .question($0) } + MockData.onboardingPages.map { .info($0) }
+    }
+
+    private var isLastPage: Bool { currentPage == steps.count - 1 }
+
+    private var canAdvance: Bool {
+        switch steps[currentPage] {
+        case .question(let question):
+            return answers[question.id] != nil
+        case .info:
+            return true
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -32,14 +50,14 @@ struct OnboardingView: View {
                 .padding(.top, Theme.Spacing.sm)
 
                 TabView(selection: $currentPage) {
-                    ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
-                        OnboardingPageView(page: page)
+                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                        stepView(step)
                             .tag(index)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
-                PageIndicator(pageCount: pages.count, currentPage: currentPage)
+                PageIndicator(pageCount: steps.count, currentPage: currentPage)
 
                 PrimaryButton(title: isLastPage ? "Get Started" : "Next") {
                     if isLastPage {
@@ -48,9 +66,27 @@ struct OnboardingView: View {
                         withAnimation { currentPage += 1 }
                     }
                 }
+                .disabled(!canAdvance)
+                .opacity(canAdvance ? 1 : 0.5)
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.bottom, Theme.Spacing.lg)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func stepView(_ step: OnboardingStep) -> some View {
+        switch step {
+        case .question(let question):
+            OnboardingQuestionView(
+                question: question,
+                selectedOption: Binding(
+                    get: { answers[question.id] },
+                    set: { answers[question.id] = $0 }
+                )
+            )
+        case .info(let page):
+            OnboardingPageView(page: page)
         }
     }
 }
