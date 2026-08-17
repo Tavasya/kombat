@@ -62,4 +62,17 @@ final class AppState: ObservableObject {
         isLoggedIn = false
         withAnimation { flow = .landing }
     }
+
+    /// Permanently deletes the account server-side (via the `delete-account` Edge
+    /// Function, which cascades to their scans) and resets all local state.
+    func deleteAccount() async throws {
+        _ = try await SupabaseService.client.functions.invoke(
+            "delete-account",
+            options: FunctionInvokeOptions(method: .post)
+        )
+        userEmail = ""
+        isLoggedIn = false
+        hasCompletedOnboarding = false
+        withAnimation { flow = .landing }
+    }
 }

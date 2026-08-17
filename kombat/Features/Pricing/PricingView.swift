@@ -9,6 +9,9 @@ struct PricingView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var store: StoreManager
 
+    @State private var showPrivacyPolicy = false
+    @State private var showTermsOfUse = false
+
     private let features = [
         "Unlimited AI form scans",
         "Full technique breakdowns by strike type",
@@ -101,10 +104,25 @@ struct PricingView: View {
                     }
                     .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.Colors.textSecondary)
+
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Text("By continuing you agree to our")
+                        Button("Terms") { showTermsOfUse = true }
+                        Text("and")
+                        Button("Privacy Policy") { showPrivacyPolicy = true }
+                    }
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.bottom, Theme.Spacing.lg)
             }
+        }
+        .sheet(isPresented: $showPrivacyPolicy) {
+            NavigationStack { PrivacyPolicyView() }
+        }
+        .sheet(isPresented: $showTermsOfUse) {
+            NavigationStack { TermsOfUseView() }
         }
     }
 
