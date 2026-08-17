@@ -3,11 +3,15 @@
 //  kombat
 //
 
+import PhotosUI
 import SwiftUI
 
 struct VideoView: View {
     @StateObject private var camera = CameraService()
     @State private var sessions: [ScanSession] = MockData.scanSessions
+    @State private var pickedVideo: PhotosPickerItem?
+    @State private var isImporting = false
+    @State private var importFailed = false
 
     var body: some View {
         ScrollView {
@@ -19,6 +23,19 @@ struct VideoView: View {
                 Text(statusText)
                     .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.Colors.textSecondary)
+
+                PhotosPicker(selection: $pickedVideo, matching: .videos) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        if isImporting {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        Text(isImporting ? "Importing…" : "Upload a Video")
+                    }
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(isImporting)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     SectionHeader(title: "Past Scans")
@@ -38,14 +55,17 @@ struct VideoView: View {
         .onDisappear { camera.stop() }
         .onChange(of: camera.lastRecording?.id) {
             guard let recording = camera.lastRecording else { return }
-            // Form analysis isn't built yet, so log the scan with a placeholder score.
-            let session = ScanSession(
-                date: .now,
-                category: .combo,
-                formScore: Int.random(in: 60...92),
-                durationSeconds: recording.durationSeconds
-            )
-            withAnimation { sessions.insert(session, at: 0) }
+            logScan(durationSeconds: recording.durationSeconds)
+        }
+        .onChange(of: pickedVideo) {
+            guard let item = pickedVideo else { return }
+            pickedVideo = nil
+            importVideo(from: item)
+        }
+        .alert("Couldn't import that video", isPresented: $importFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Try a different video from your library.")
         }
     }
 
@@ -59,14 +79,37 @@ struct VideoView: View {
     private var statusText: String {
         switch camera.status {
         case .ready:
-            return camera.isRecording ? "Recording…" : "Tap to start a scan"
+            return camera.isRecording ? "Recording…" : "Tap to record, or upload from your library"
         case .denied:
-            return "Camera permission needed"
+            return "Camera permission needed — you can still upload a video"
         case .failed:
-            return "Camera unavailable"
+            return "Camera unavailable — you can still upload a video"
         case .idle, .requestingPermission:
             return "Preparing camera…"
         }
+    }
+
+    private func importVideo(from item: PhotosPickerItem) {
+        isImporting = true
+        Task {
+            defer { isImporting = false }
+            guard let video = try? await item.loadTransferable(type: ImportedVideo.self) else {
+                importFailed = true
+                return
+            }
+            logScan(durationSeconds: await video.durationSeconds())
+        }
+    }
+
+    /// Form analysis isn't built yet, so scans are logged with a placeholder score.
+    private func logScan(durationSeconds: Int) {
+        let session = ScanSession(
+            date: .now,
+            category: .combo,
+            formScore: Int.random(in: 60...92),
+            durationSeconds: durationSeconds
+        )
+        withAnimation { sessions.insert(session, at: 0) }
     }
 }
 
