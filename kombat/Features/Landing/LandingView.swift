@@ -35,7 +35,7 @@ struct LandingView: View {
                 Spacer()
 
                 PrimaryButton(title: "Get Started") {
-                    appState.beginOnboarding()
+                    appState.beginAuth()
                 }
                 .padding(.bottom, Theme.Spacing.lg)
             }

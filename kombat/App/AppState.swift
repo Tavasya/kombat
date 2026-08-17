@@ -7,8 +7,8 @@ import SwiftUI
 
 enum AppFlow {
     case landing
-    case onboarding
     case auth
+    case onboarding
     case pricing
     case main
 }
@@ -25,9 +25,7 @@ final class AppState: ObservableObject {
         if isLoggedIn {
             // Whether the live screen ends up being Pricing or Main is decided by
             // RootView based on real subscription status, not this checkpoint alone.
-            flow = .pricing
-        } else if hasCompletedOnboarding {
-            flow = .auth
+            flow = hasCompletedOnboarding ? .pricing : .onboarding
         }
     }
 
@@ -39,23 +37,23 @@ final class AppState: ObservableObject {
         }
     }
 
-    func beginOnboarding() {
-        withAnimation { flow = .onboarding }
-    }
-
-    func completeOnboarding() {
-        hasCompletedOnboarding = true
+    func beginAuth() {
         withAnimation { flow = .auth }
-    }
-
-    func skipOnboarding() {
-        completeOnboarding()
     }
 
     func completeAuth(email: String) {
         userEmail = email
         isLoggedIn = true
+        withAnimation { flow = .onboarding }
+    }
+
+    func completeOnboarding() {
+        hasCompletedOnboarding = true
         withAnimation { flow = .pricing }
+    }
+
+    func skipOnboarding() {
+        completeOnboarding()
     }
 
     func signOut() {
