@@ -34,14 +34,8 @@ struct LandingView: View {
 
                 Spacer()
 
-                VStack(spacing: Theme.Spacing.md) {
-                    PrimaryButton(title: "Get Started") {
-                        appState.beginOnboarding()
-                    }
-
-                    TextLinkButton(title: "Already have an account? Log In") {
-                        appState.skipToAuth()
-                    }
+                PrimaryButton(title: "Get Started") {
+                    appState.beginOnboarding()
                 }
                 .padding(.bottom, Theme.Spacing.lg)
             }

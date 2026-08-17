@@ -13,19 +13,16 @@ enum AppFlow {
     case main
 }
 
-enum AuthMode {
-    case login
-    case signUp
-}
+private let sessionKeychainKey = "session"
 
 @MainActor
 final class AppState: ObservableObject {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("hasSeenPricing") private var hasSeenPricing = false
     @AppStorage("isLoggedIn") private var isLoggedIn = false
+    @AppStorage("userPhoneNumber") private(set) var userPhoneNumber = ""
 
     @Published var flow: AppFlow = .landing
-    @Published var authMode: AuthMode = .signUp
     @Published var selectedPlanID: String = "free"
 
     init() {
@@ -61,20 +58,18 @@ final class AppState: ObservableObject {
         selectPricingPlan("free")
     }
 
-    func completeAuth() {
+    func completeAuth(session: AuthSession) {
+        if let data = try? JSONEncoder().encode(session) {
+            KeychainHelper.save(data, key: sessionKeychainKey)
+        }
+        userPhoneNumber = session.phone
         isLoggedIn = true
         withAnimation { flow = .main }
     }
 
-    /// Jumps straight to Auth for a returning user, marking prior checkpoints complete.
-    func skipToAuth() {
-        hasCompletedOnboarding = true
-        hasSeenPricing = true
-        authMode = .login
-        withAnimation { flow = .auth }
-    }
-
     func signOut() {
+        KeychainHelper.delete(key: sessionKeychainKey)
+        userPhoneNumber = ""
         isLoggedIn = false
         withAnimation { flow = .landing }
     }

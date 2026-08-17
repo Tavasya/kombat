@@ -57,6 +57,17 @@ struct HomeView: View {
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationTitle("Home")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                }
+                .accessibilityLabel("Settings")
+            }
+        }
     }
 }
 
