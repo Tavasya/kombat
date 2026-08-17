@@ -38,9 +38,15 @@ final class StoreManager: ObservableObject {
         defer { isLoading = false }
         do {
             let products = try await Product.products(for: [Self.monthlyProductID])
-            product = products.first
+            if let first = products.first {
+                product = first
+                errorMessage = nil
+            } else {
+                product = nil
+                errorMessage = "Subscription not available yet. If you just created it in App Store Connect, it can take a few hours to activate — try again shortly."
+            }
         } catch {
-            errorMessage = "Couldn't load subscription info. Check your connection and try again."
+            errorMessage = "Couldn't load subscription info: \(error.localizedDescription)"
         }
     }
 

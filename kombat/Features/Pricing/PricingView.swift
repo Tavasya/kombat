@@ -72,11 +72,19 @@ struct PricingView: View {
                 .padding(.horizontal, Theme.Spacing.lg)
 
                 if let errorMessage = store.errorMessage {
-                    Text(errorMessage)
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Colors.scoreLow)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Theme.Spacing.lg)
+                    VStack(spacing: Theme.Spacing.xs) {
+                        Text(errorMessage)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.scoreLow)
+                            .multilineTextAlignment(.center)
+
+                        Button("Retry") {
+                            Task { await store.loadProduct() }
+                        }
+                        .font(Theme.Typography.caption.weight(.semibold))
+                        .foregroundStyle(Theme.Colors.accent)
+                    }
+                    .padding(.horizontal, Theme.Spacing.lg)
                 }
 
                 Spacer()
