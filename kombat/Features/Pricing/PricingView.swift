@@ -32,7 +32,7 @@ struct PricingView: View {
                     Text("Unlock Kombat Premium")
                         .font(Theme.Typography.title)
                         .foregroundStyle(Theme.Colors.textPrimary)
-                    Text("Try it free for 7 days, then \(priceText)/month.")
+                    Text("Try it free for 7 days, then \(priceText)/month as an auto-renewable subscription.")
                         .font(Theme.Typography.subheadline)
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -66,7 +66,7 @@ struct PricingView: View {
                         }
                     }
 
-                    Text("Cancel anytime before your trial ends and you won't be charged.")
+                    Text("Kombat Premium is a \(priceText)/month auto-renewable subscription. It automatically renews unless canceled at least 24 hours before the end of the current period. Cancel anytime in Settings.")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
