@@ -25,6 +25,7 @@ struct RootView: View {
         }
         .environmentObject(appState)
         .background(Theme.Colors.background.ignoresSafeArea())
+        .onAppear { appState.validateSession() }
     }
 }
 

@@ -13,8 +13,6 @@ enum AppFlow {
     case main
 }
 
-private let sessionKeychainKey = "session"
-
 @MainActor
 final class AppState: ObservableObject {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -32,6 +30,14 @@ final class AppState: ObservableObject {
             flow = .auth
         } else if hasCompletedOnboarding {
             flow = .pricing
+        }
+    }
+
+    /// The SDK restores sessions from the keychain and refreshes tokens on its
+    /// own; this just catches the case where the stored session is gone entirely.
+    func validateSession() {
+        if isLoggedIn && SupabaseService.client.auth.currentSession == nil {
+            signOut()
         }
     }
 
@@ -58,17 +64,14 @@ final class AppState: ObservableObject {
         selectPricingPlan("free")
     }
 
-    func completeAuth(session: AuthSession) {
-        if let data = try? JSONEncoder().encode(session) {
-            KeychainHelper.save(data, key: sessionKeychainKey)
-        }
-        userEmail = session.email
+    func completeAuth(email: String) {
+        userEmail = email
         isLoggedIn = true
         withAnimation { flow = .main }
     }
 
     func signOut() {
-        KeychainHelper.delete(key: sessionKeychainKey)
+        Task { try? await SupabaseService.client.auth.signOut() }
         userEmail = ""
         isLoggedIn = false
         withAnimation { flow = .landing }

@@ -105,17 +105,18 @@ struct AuthView: View {
         Task {
             do {
                 if isSignUp {
-                    switch try await SupabaseAuthClient.signUp(email: email, password: password) {
-                    case .session(let session):
-                        appState.completeAuth(session: session)
-                    case .confirmationRequired:
+                    let response = try await SupabaseService.client.auth.signUp(email: email, password: password)
+                    if response.session != nil {
+                        appState.completeAuth(email: email)
+                    } else {
+                        // "Confirm email" is on, so no session until the link is clicked.
                         isLoading = false
                         infoMessage = "Check your email to confirm your account, then log in."
                         withAnimation { mode = .login }
                     }
                 } else {
-                    let session = try await SupabaseAuthClient.signIn(email: email, password: password)
-                    appState.completeAuth(session: session)
+                    _ = try await SupabaseService.client.auth.signIn(email: email, password: password)
+                    appState.completeAuth(email: email)
                 }
             } catch {
                 isLoading = false

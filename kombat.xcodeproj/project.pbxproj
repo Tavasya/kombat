@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		11CC02813032A1200012FDAF /* Kombat.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 11CC02803032A1200012FDAF /* Kombat.storekit */; };
+		5685C00330319CCD006C5AAD /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 5685C00230319CCD006C5AAD /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5685C00330319CCD006C5AAD /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +120,7 @@
 			);
 			name = kombat;
 			packageProductDependencies = (
+				5685C00230319CCD006C5AAD /* Supabase */,
 			);
 			productName = kombat;
 			productReference = 5685B6E330319CCC006C5AAD /* kombat.app */;
@@ -201,6 +204,9 @@
 			);
 			mainGroup = 5685B6DA30319CCC006C5AAD;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5685C00130319CCD006C5AAD /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5685B6E430319CCC006C5AAD /* Products */;
 			projectDirPath = "";
@@ -573,6 +579,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5685C00130319CCD006C5AAD /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5685C00230319CCD006C5AAD /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5685C00130319CCD006C5AAD /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5685B6DB30319CCC006C5AAD /* Project object */;
 }
