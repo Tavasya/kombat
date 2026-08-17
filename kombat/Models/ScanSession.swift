@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum StrikeCategory: String, CaseIterable {
+enum StrikeCategory: String, Codable, CaseIterable {
     case jabCross = "Jab/Cross"
     case roundKick = "Round Kick"
     case footwork = "Footwork"
@@ -21,14 +21,35 @@ enum StrikeCategory: String, CaseIterable {
     }
 }
 
-struct ScanSession: Identifiable {
-    let id = UUID()
+/// One row of the Supabase `scans` table. Scan metadata lives in the cloud;
+/// the video file itself stays on the device that captured it.
+struct ScanSession: Identifiable, Codable, Equatable {
+    let id: UUID
+    let userID: UUID
     let date: Date
     let category: StrikeCategory
     let formScore: Int
     let durationSeconds: Int
-    /// Present only for scans captured this session; mock history has no video.
-    var videoURL: URL? = nil
+    /// File name in `ScanVideoStore` on the capturing device; the bytes never upload.
+    let videoFileName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "user_id"
+        case date = "created_at"
+        case category
+        case formScore = "form_score"
+        case durationSeconds = "duration_seconds"
+        case videoFileName = "video_file_name"
+    }
+
+    /// Playable URL if this device still has the file (scans from other
+    /// devices, or after the file was cleaned up, aren't playable).
+    var videoURL: URL? {
+        guard let videoFileName else { return nil }
+        let url = ScanVideoStore.url(for: videoFileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
 
     var durationText: String {
         let minutes = durationSeconds / 60

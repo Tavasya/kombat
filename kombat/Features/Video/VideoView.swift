@@ -8,7 +8,7 @@ import SwiftUI
 
 struct VideoView: View {
     @StateObject private var camera = CameraService()
-    @State private var sessions: [ScanSession] = MockData.scanSessions
+    @EnvironmentObject private var scanRepository: ScanRepository
     @State private var pickedVideo: PhotosPickerItem?
     @State private var isImporting = false
     @State private var importFailed = false
@@ -41,17 +41,26 @@ struct VideoView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     SectionHeader(title: "Past Scans")
 
-                    LazyVStack(spacing: Theme.Spacing.sm) {
-                        ForEach(sessions) { session in
-                            if session.videoURL != nil {
-                                Button {
-                                    playingSession = session
-                                } label: {
-                                    ScanHistoryRow(session: session)
-                                }
-                                .buttonStyle(.plain)
-                            } else {
-                                ScanHistoryRow(session: session)
+                    if let message = scanRepository.errorMessage {
+                        Text(message)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.scoreLow)
+                    }
+
+                    if scanRepository.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(Theme.Spacing.lg)
+                    } else if scanRepository.scans.isEmpty {
+                        Text("No scans yet — record or upload your first one.")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(Theme.Spacing.lg)
+                    } else {
+                        LazyVStack(spacing: Theme.Spacing.sm) {
+                            ForEach(scanRepository.scans) { session in
+                                scanRow(session)
                             }
                         }
                     }
@@ -79,6 +88,29 @@ struct VideoView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Try a different video from your library.")
+        }
+    }
+
+    @ViewBuilder
+    private func scanRow(_ session: ScanSession) -> some View {
+        Group {
+            if session.videoURL != nil {
+                Button {
+                    playingSession = session
+                } label: {
+                    ScanHistoryRow(session: session)
+                }
+                .buttonStyle(.plain)
+            } else {
+                ScanHistoryRow(session: session)
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                Task { await scanRepository.delete(session) }
+            } label: {
+                Label("Delete Scan", systemImage: "trash")
+            }
         }
     }
 
@@ -116,14 +148,14 @@ struct VideoView: View {
 
     /// Form analysis isn't built yet, so scans are logged with a placeholder score.
     private func logScan(durationSeconds: Int, videoURL: URL?) {
-        let session = ScanSession(
-            date: .now,
-            category: .combo,
-            formScore: Int.random(in: 60...92),
-            durationSeconds: durationSeconds,
-            videoURL: videoURL
-        )
-        withAnimation { sessions.insert(session, at: 0) }
+        Task {
+            await scanRepository.addScan(
+                category: .combo,
+                formScore: Int.random(in: 60...92),
+                durationSeconds: durationSeconds,
+                videoTempURL: videoURL
+            )
+        }
     }
 }
 
@@ -131,4 +163,5 @@ struct VideoView: View {
     NavigationStack {
         VideoView()
     }
+    .environmentObject(ScanRepository())
 }

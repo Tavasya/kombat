@@ -13,8 +13,6 @@ enum AppFlow {
     case main
 }
 
-private let sessionKeychainKey = "session"
-
 @MainActor
 final class AppState: ObservableObject {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -23,21 +21,21 @@ final class AppState: ObservableObject {
 
     @Published var flow: AppFlow = .landing
 
-    private var currentAccessToken: String?
-    private var currentUserID: String?
-
     init() {
         if isLoggedIn {
-            if let data = KeychainHelper.read(key: sessionKeychainKey),
-               let session = try? JSONDecoder().decode(AuthSession.self, from: data) {
-                currentAccessToken = session.accessToken
-                currentUserID = session.userID
-            }
             // Whether the live screen ends up being Pricing or Main is decided by
             // RootView based on real subscription status, not this checkpoint alone.
             flow = .pricing
         } else if hasCompletedOnboarding {
             flow = .auth
+        }
+    }
+
+    /// The SDK restores sessions from the keychain and refreshes tokens on its
+    /// own; this just catches the case where the stored session is gone entirely.
+    func validateSession() {
+        if isLoggedIn && SupabaseService.client.auth.currentSession == nil {
+            signOut()
         }
     }
 
@@ -54,32 +52,21 @@ final class AppState: ObservableObject {
         completeOnboarding()
     }
 
-    func completeAuth(session: AuthSession) {
-        if let data = try? JSONEncoder().encode(session) {
-            KeychainHelper.save(data, key: sessionKeychainKey)
-        }
-        userEmail = session.email
-        currentAccessToken = session.accessToken
-        currentUserID = session.userID
+    func completeAuth(email: String) {
+        userEmail = email
         isLoggedIn = true
         withAnimation { flow = .pricing }
 
         Task {
-            try? await SupabaseDatabaseClient.upsertProfile(
-                accessToken: session.accessToken,
-                userID: session.userID,
-                email: session.email
-            )
+            try? await SupabaseDatabaseClient.upsertProfile(email: email)
         }
     }
 
     /// Mirrors the live StoreKit entitlement into the `profiles` table so it's visible
     /// outside the app (e.g. in the Supabase dashboard), not used to gate access locally.
     func syncSubscriptionStatus(isSubscribed: Bool, productID: String?) async {
-        guard let token = currentAccessToken, let userID = currentUserID else { return }
+        guard isLoggedIn else { return }
         try? await SupabaseDatabaseClient.upsertProfile(
-            accessToken: token,
-            userID: userID,
             email: userEmail,
             isSubscribed: isSubscribed,
             productID: productID
@@ -87,10 +74,8 @@ final class AppState: ObservableObject {
     }
 
     func signOut() {
-        KeychainHelper.delete(key: sessionKeychainKey)
+        Task { try? await SupabaseService.client.auth.signOut() }
         userEmail = ""
-        currentAccessToken = nil
-        currentUserID = nil
         isLoggedIn = false
         withAnimation { flow = .landing }
     }

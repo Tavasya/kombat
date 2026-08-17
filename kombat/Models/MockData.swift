@@ -24,18 +24,6 @@ enum MockData {
         )
     ]
 
-    static let scanSessions: [ScanSession] = {
-        let now = Date()
-        let calendar = Calendar.current
-        return [
-            ScanSession(date: calendar.date(byAdding: .hour, value: -5, to: now)!, category: .jabCross, formScore: 88, durationSeconds: 95),
-            ScanSession(date: calendar.date(byAdding: .day, value: -1, to: now)!, category: .roundKick, formScore: 74, durationSeconds: 122),
-            ScanSession(date: calendar.date(byAdding: .day, value: -2, to: now)!, category: .footwork, formScore: 91, durationSeconds: 80),
-            ScanSession(date: calendar.date(byAdding: .day, value: -4, to: now)!, category: .combo, formScore: 62, durationSeconds: 140),
-            ScanSession(date: calendar.date(byAdding: .day, value: -6, to: now)!, category: .jabCross, formScore: 79, durationSeconds: 101)
-        ]
-    }()
-
     static let statPoints: [StatPoint] = {
         let now = Date()
         let calendar = Calendar.current

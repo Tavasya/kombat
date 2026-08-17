@@ -8,8 +8,10 @@ import SwiftUI
 struct HomeView: View {
     let onStartScan: () -> Void
 
+    @EnvironmentObject private var scanRepository: ScanRepository
+
     private var summary: UserSummary { MockData.userSummary }
-    private var sessions: [ScanSession] { MockData.scanSessions }
+    private var sessions: [ScanSession] { Array(scanRepository.scans.prefix(5)) }
 
     var body: some View {
         ScrollView {
@@ -47,9 +49,17 @@ struct HomeView: View {
 
                 SectionHeader(title: "Recent Activity")
 
-                LazyVStack(spacing: Theme.Spacing.sm) {
-                    ForEach(sessions) { session in
-                        RecentActivityRow(session: session)
+                if sessions.isEmpty {
+                    Text("Your recent scans will show up here.")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(Theme.Spacing.lg)
+                } else {
+                    LazyVStack(spacing: Theme.Spacing.sm) {
+                        ForEach(sessions) { session in
+                            RecentActivityRow(session: session)
+                        }
                     }
                 }
             }
@@ -75,4 +85,5 @@ struct HomeView: View {
     NavigationStack {
         HomeView(onStartScan: {})
     }
+    .environmentObject(ScanRepository())
 }

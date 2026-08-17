@@ -13,6 +13,7 @@ enum MainTab {
 
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .home
+    @StateObject private var scanRepository = ScanRepository()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -41,6 +42,8 @@ struct MainTabView: View {
             .tag(MainTab.stats)
         }
         .tint(Theme.Colors.accent)
+        .environmentObject(scanRepository)
+        .task { await scanRepository.load() }
     }
 }
 
