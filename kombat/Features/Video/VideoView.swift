@@ -11,6 +11,7 @@ struct VideoView: View {
     @EnvironmentObject private var scanRepository: ScanRepository
     @State private var pickedVideo: PhotosPickerItem?
     @State private var isImporting = false
+    @State private var isScoring = false
     @State private var importFailed = false
     @State private var playingSession: ScanSession?
 
@@ -40,6 +41,17 @@ struct VideoView: View {
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     SectionHeader(title: "Past Scans")
+
+                    if isScoring {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            ProgressView()
+                            Text("Analyzing and scoring your scan…")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(Theme.Spacing.sm)
+                    }
 
                     if let message = scanRepository.errorMessage {
                         Text(message)
@@ -146,14 +158,23 @@ struct VideoView: View {
         }
     }
 
-    /// Form analysis isn't built yet, so scans are logged with a placeholder score.
+    /// Analyzes poses, scores the form, and records the scan.
     private func logScan(durationSeconds: Int, videoURL: URL?) {
         Task {
+            isScoring = true
+            defer { isScoring = false }
+            var frames: [PoseFrame] = []
+            if let videoURL {
+                frames = (try? await PoseAnalyzer.analyze(videoURL: videoURL)) ?? []
+            }
+            let result = FormScorer.score(frames: frames)
             await scanRepository.addScan(
                 category: .combo,
-                formScore: Int.random(in: 60...92),
+                formScore: result.score,
                 durationSeconds: durationSeconds,
-                videoTempURL: videoURL
+                breakdown: result.breakdown,
+                videoTempURL: videoURL,
+                poseFrames: frames
             )
         }
     }

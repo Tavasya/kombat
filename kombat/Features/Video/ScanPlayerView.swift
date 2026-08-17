@@ -20,26 +20,37 @@ struct ScanPlayerView: View {
 
     var body: some View {
         NavigationStack {
-            VideoPlayer(player: player) {
-                PoseOverlayView(poses: currentPoses)
-            }
-            .ignoresSafeArea(edges: .bottom)
-            .background(.black)
-            .overlay(alignment: .top) {
-                if isAnalyzing {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        ProgressView()
-                            .tint(.white)
-                        Text("Analyzing form…")
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(.white)
+            VStack(spacing: 0) {
+                VideoPlayer(player: player) {
+                    PoseOverlayView(poses: currentPoses)
+                }
+                .background(.black)
+                .overlay(alignment: .top) {
+                    if isAnalyzing {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            ProgressView()
+                                .tint(.white)
+                            Text("Analyzing form…")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .padding(.top, Theme.Spacing.md)
                     }
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .background(.black.opacity(0.55), in: Capsule())
-                    .padding(.top, Theme.Spacing.md)
+                }
+
+                if let breakdown = session.breakdown {
+                    BreakdownPanel(score: session.formScore, breakdown: breakdown) { time in
+                        player.seek(to: CMTime(seconds: max(time - 1, 0), preferredTimescale: 600))
+                        player.play()
+                    }
+                    .frame(maxHeight: 260)
                 }
             }
+            .ignoresSafeArea(edges: .bottom)
+            .background(Theme.Colors.background)
             .navigationTitle(session.category.rawValue)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

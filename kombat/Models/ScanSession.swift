@@ -32,6 +32,8 @@ struct ScanSession: Identifiable, Codable, Equatable {
     let durationSeconds: Int
     /// File name in `ScanVideoStore` on the capturing device; the bytes never upload.
     let videoFileName: String?
+    /// Per-rule scoring evidence; nil for scans made before the scoring engine.
+    let breakdown: ScanBreakdown?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -41,6 +43,7 @@ struct ScanSession: Identifiable, Codable, Equatable {
         case formScore = "form_score"
         case durationSeconds = "duration_seconds"
         case videoFileName = "video_file_name"
+        case breakdown
     }
 
     /// Playable URL if this device still has the file (scans from other

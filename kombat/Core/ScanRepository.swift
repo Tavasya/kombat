@@ -31,11 +31,22 @@ final class ScanRepository: ObservableObject {
         }
     }
 
-    /// Moves the video into permanent storage and records the scan.
-    func addScan(category: StrikeCategory, formScore: Int, durationSeconds: Int, videoTempURL: URL?) async {
+    /// Moves the video into permanent storage, caches its analyzed poses so
+    /// playback never re-analyzes, and records the scan.
+    func addScan(
+        category: StrikeCategory,
+        formScore: Int,
+        durationSeconds: Int,
+        breakdown: ScanBreakdown?,
+        videoTempURL: URL?,
+        poseFrames: [PoseFrame]
+    ) async {
         do {
             let userID = try await client.auth.session.user.id
             let fileName = videoTempURL.flatMap { try? ScanVideoStore.store(fileAt: $0) }
+            if let fileName, !poseFrames.isEmpty {
+                PoseCache.save(poseFrames, for: fileName)
+            }
             let scan = ScanSession(
                 id: UUID(),
                 userID: userID,
@@ -43,7 +54,8 @@ final class ScanRepository: ObservableObject {
                 category: category,
                 formScore: formScore,
                 durationSeconds: durationSeconds,
-                videoFileName: fileName
+                videoFileName: fileName,
+                breakdown: breakdown
             )
             try await client.from("scans").insert(scan).execute()
             scans.insert(scan, at: 0)
