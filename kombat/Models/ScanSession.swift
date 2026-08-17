@@ -34,6 +34,8 @@ struct ScanSession: Identifiable, Codable, Equatable {
     let videoFileName: String?
     /// Per-rule scoring evidence; nil for scans made before the scoring engine.
     let breakdown: ScanBreakdown?
+    /// LLM coaching prose derived from the breakdown; nil until generated.
+    var coaching: ScanCoaching?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -44,6 +46,7 @@ struct ScanSession: Identifiable, Codable, Equatable {
         case durationSeconds = "duration_seconds"
         case videoFileName = "video_file_name"
         case breakdown
+        case coaching
     }
 
     /// Playable URL if this device still has the file (scans from other

@@ -60,8 +60,24 @@ final class ScanRepository: ObservableObject {
             try await client.from("scans").insert(scan).execute()
             scans.insert(scan, at: 0)
             errorMessage = nil
+            if let breakdown {
+                await generateCoaching(for: scan, breakdown: breakdown)
+            }
         } catch {
             errorMessage = "Couldn't save your scan. Check your connection."
+        }
+    }
+
+    /// Best-effort: a failed coaching call never blocks or invalidates the scan.
+    private func generateCoaching(for scan: ScanSession, breakdown: ScanBreakdown) async {
+        guard let coaching = try? await CoachingClient.generate(from: breakdown) else { return }
+        do {
+            try await client.from("scans").update(["coaching": coaching]).eq("id", value: scan.id).execute()
+            if let index = scans.firstIndex(where: { $0.id == scan.id }) {
+                scans[index].coaching = coaching
+            }
+        } catch {
+            // Scan already saved; coaching just didn't persist. Not user-facing.
         }
     }
 

@@ -42,7 +42,7 @@ struct ScanPlayerView: View {
                 }
 
                 if let breakdown = session.breakdown {
-                    BreakdownPanel(score: session.formScore, breakdown: breakdown) { time in
+                    BreakdownPanel(score: session.formScore, breakdown: breakdown, coaching: session.coaching) { time in
                         player.seek(to: CMTime(seconds: max(time - 1, 0), preferredTimescale: 600))
                         player.play()
                     }

@@ -15,7 +15,15 @@ import Vision
 /// technique's rules; uncertain reps get only the universal rules. A
 /// continuous "guard discipline" rule runs across the whole video.
 enum FormScorer {
-    static let engineVersion = 2
+    static let engineVersion = 3
+
+    enum Category: String, CaseIterable {
+        case striking = "Striking"
+        case blocking = "Blocking"
+        case footwork = "Footwork"
+        case positioning = "Positioning"
+        case headMovement = "Head Movement"
+    }
 
     /// Tuning knobs, kept in one place so they can move to remote config later.
     struct Config {
@@ -49,7 +57,32 @@ enum FormScorer {
         // Guard discipline (whole-video interval rule).
         var disciplineGuardWidths = 0.8
         var disciplineLapseSeconds = 2.0
-        var disciplineWeight = 0.15
+
+        // Footwork: healthy stance width range and how much foot movement counts as mobile.
+        var stanceMinWidths = 0.9
+        var stanceMaxWidths = 1.7
+        var mobilitySpeedThreshold = 0.25    // ankle speed in sw/s that counts as moving
+        var mobilityTargetRatio = 0.35, mobilityFloorRatio = 0.05
+        var plantedLapseSeconds = 3.0
+
+        // Positioning: weight staying over the base (hip midpoint vs ankle midpoint).
+        var balanceTargetOffset = 0.15, balanceFloorOffset = 0.5
+
+        // Head movement: how far the head leaves the centerline after a punch.
+        var headMoveTargetWidths = 0.12, headMoveFloorWidths = 0.02
+
+        // How each category contributes to the overall form score.
+        var categoryWeights: [Category: Double] = [
+            .striking: 0.45,
+            .blocking: 0.20,
+            .footwork: 0.15,
+            .positioning: 0.10,
+            .headMovement: 0.10
+        ]
+
+        /// Below this fraction of frames with the needed joints visible, a
+        /// category reports "not enough data" instead of a score.
+        var minJointVisibility = 0.5
     }
 
     enum Technique: String {
@@ -183,7 +216,8 @@ enum FormScorer {
                     time: rep.peakTime,
                     rule: worst.key.rawValue,
                     message: worst.key.failureMessage(for: rep.technique),
-                    score: Int(worst.value.rounded())
+                    score: Int(worst.value.rounded()),
+                    category: (rep.technique == .check ? Category.blocking : Category.striking).rawValue
                 ))
             }
         }
@@ -214,8 +248,49 @@ enum FormScorer {
             )
         }.sorted { $0.count > $1.count }
 
+        // Assemble the five category reports.
         let repAverage = repScores.isEmpty ? 0 : repScores.reduce(0, +) / Double(repScores.count)
-        let overall = Int((repAverage * (1 - config.disciplineWeight) + Double(discipline.score) * config.disciplineWeight).rounded())
+        let striking = ScanBreakdown.CategoryReport(
+            name: Category.striking.rawValue,
+            score: Int(repAverage.rounded()),
+            metrics: [
+                ScanBreakdown.MetricValue(name: "Strikes analyzed", value: "\(reps.count)", score: Int(repAverage.rounded()))
+            ] + ruleScores.filter { $0.rule != Rule.guardDiscipline.rawValue }.map {
+                ScanBreakdown.MetricValue(name: $0.rule, value: "\($0.score)/100", score: $0.score)
+            },
+            dataNote: nil
+        )
+
+        let checkScores = zip(reps, repScores).filter { $0.0.technique == .check }.map { $0.1 }
+        let checkAverage = checkScores.isEmpty ? nil : checkScores.reduce(0, +) / Double(checkScores.count)
+        let blockingScore = checkAverage.map { Int((Double(discipline.score) * 0.6 + $0 * 0.4).rounded()) } ?? discipline.score
+        var blockingMetrics = [
+            ScanBreakdown.MetricValue(name: "Guard held between strikes", value: "\(discipline.score)% of the time", score: discipline.score)
+        ]
+        if let checkAverage {
+            blockingMetrics.append(ScanBreakdown.MetricValue(name: "Checks", value: "\(checkScores.count) thrown", score: Int(checkAverage.rounded())))
+        }
+        let blocking = ScanBreakdown.CategoryReport(
+            name: Category.blocking.rawValue, score: blockingScore, metrics: blockingMetrics, dataNote: nil
+        )
+
+        var intervalFindings: [ScanBreakdown.Finding] = []
+        let quiet = quietSamples(samples: samples, reps: reps, config: config)
+        let footwork = footworkCategory(quiet: quiet, samples: samples, shoulderWidth: shoulderWidth, config: config, findings: &intervalFindings)
+        let positioning = positioningCategory(quiet: quiet, shoulderWidth: shoulderWidth, config: config)
+        let headMovement = headMovementCategory(reps: reps, samples: samples, shoulderWidth: shoulderWidth, config: config, findings: &intervalFindings)
+        findings.append(contentsOf: intervalFindings)
+
+        let categories = [striking, blocking, footwork, positioning, headMovement]
+
+        // Overall = weighted blend of measurable categories.
+        var weighted = 0.0, weightSum = 0.0
+        for report in categories where report.dataNote == nil {
+            let weight = Category(rawValue: report.name).flatMap { config.categoryWeights[$0] } ?? 0
+            weighted += Double(report.score) * weight
+            weightSum += weight
+        }
+        let overall = weightSum > 0 ? Int((weighted / weightSum).rounded()) : Int(repAverage.rounded())
 
         let breakdown = ScanBreakdown(
             engineVersion: engineVersion,
@@ -223,13 +298,14 @@ enum FormScorer {
             note: nil,
             ruleScores: ruleScores,
             findings: findings.sorted { $0.time < $1.time },
-            techniques: techniques
+            techniques: techniques,
+            categories: categories
         )
         return (overall, derivedCategory(reps: reps), breakdown)
     }
 
     private static func empty(note: String) -> (score: Int, category: StrikeCategory, breakdown: ScanBreakdown) {
-        (0, .combo, ScanBreakdown(engineVersion: engineVersion, repCount: 0, note: note, ruleScores: [], findings: [], techniques: []))
+        (0, .combo, ScanBreakdown(engineVersion: engineVersion, repCount: 0, note: note, ruleScores: [], findings: [], techniques: [], categories: []))
     }
 
     /// The scan's category label is derived from what was actually thrown.
@@ -532,7 +608,8 @@ enum FormScorer {
                     time: start,
                     rule: Rule.guardDiscipline.rawValue,
                     message: Rule.guardDiscipline.failureMessage(for: .unknown),
-                    score: 0
+                    score: 0,
+                    category: Category.blocking.rawValue
                 ))
             }
             lapseStart = nil
@@ -556,6 +633,181 @@ enum FormScorer {
 
         guard judged > 0 else { return (100, []) }
         return (Int((Double(up) / Double(judged) * 100).rounded()), findings)
+    }
+
+    // MARK: - Interval categories (footwork, positioning, head movement)
+
+    /// Samples outside strike windows — where stance, balance, and guard live.
+    private static func quietSamples(samples: [Sample], reps: [Rep], config: Config) -> [Sample] {
+        samples.filter { sample in
+            !reps.contains { abs($0.peakTime - sample.time) < config.repWindowAfter }
+        }
+    }
+
+    private static func footworkCategory(
+        quiet: [Sample],
+        samples: [Sample],
+        shoulderWidth: Double,
+        config: Config,
+        findings: inout [ScanBreakdown.Finding]
+    ) -> ScanBreakdown.CategoryReport {
+        // Both ankles must be visible often enough to say anything honest.
+        let visible = quiet.filter { $0.joints[.leftAnkle] != nil && $0.joints[.rightAnkle] != nil }
+        guard !quiet.isEmpty, Double(visible.count) / Double(quiet.count) >= config.minJointVisibility else {
+            return ScanBreakdown.CategoryReport(
+                name: Category.footwork.rawValue, score: 0, metrics: [],
+                dataNote: "Feet weren't visible enough to assess footwork — film with your full body in frame."
+            )
+        }
+
+        // Stance width: fraction of time inside the healthy range.
+        let inRange = visible.filter { sample in
+            guard let l = sample.joints[.leftAnkle], let r = sample.joints[.rightAnkle] else { return false }
+            let width = distance(l, r) / shoulderWidth
+            return width >= config.stanceMinWidths && width <= config.stanceMaxWidths
+        }
+        let stanceScore = Int((Double(inRange.count) / Double(visible.count) * 100).rounded())
+
+        // Mobility: fraction of quiet time with meaningful foot movement.
+        let leftSpeeds = jointSpeeds(samples: samples, joint: .leftAnkle, shoulderWidth: shoulderWidth)
+        let rightSpeeds = jointSpeeds(samples: samples, joint: .rightAnkle, shoulderWidth: shoulderWidth)
+        var speedAt: [Double: Double] = [:]
+        for (l, r) in zip(leftSpeeds, rightSpeeds) {
+            speedAt[l.time] = max(l.speed, r.speed)
+        }
+        let quietTimes = Set(quiet.map(\.time))
+        let moving = quiet.filter { (speedAt[$0.time] ?? 0) > config.mobilitySpeedThreshold }
+        let mobilityRatio = Double(moving.count) / Double(quiet.count)
+        let mobilityScore = Int(linearScore(
+            mobilityRatio, target: config.mobilityTargetRatio, floor: config.mobilityFloorRatio, higherIsBetter: true
+        ).rounded())
+
+        // Flag long planted stretches.
+        var plantedStart: Double?
+        for entry in leftSpeeds where quietTimes.contains(entry.time) {
+            let speed = speedAt[entry.time] ?? 0
+            if speed <= config.mobilitySpeedThreshold {
+                if plantedStart == nil { plantedStart = entry.time }
+            } else {
+                if let start = plantedStart, entry.time - start >= config.plantedLapseSeconds {
+                    findings.append(ScanBreakdown.Finding(
+                        id: UUID(), time: start, rule: "Mobility",
+                        message: "Feet stayed planted — keep moving between strikes",
+                        score: mobilityScore, category: Category.footwork.rawValue
+                    ))
+                }
+                plantedStart = nil
+            }
+        }
+
+        let score = (stanceScore + mobilityScore) / 2
+        return ScanBreakdown.CategoryReport(
+            name: Category.footwork.rawValue,
+            score: score,
+            metrics: [
+                ScanBreakdown.MetricValue(name: "Stance width", value: "in range \(stanceScore)% of the time", score: stanceScore),
+                ScanBreakdown.MetricValue(name: "Mobility", value: "moving \(Int((mobilityRatio * 100).rounded()))% of the time", score: mobilityScore)
+            ],
+            dataNote: nil
+        )
+    }
+
+    private static func positioningCategory(
+        quiet: [Sample],
+        shoulderWidth: Double,
+        config: Config
+    ) -> ScanBreakdown.CategoryReport {
+        // Balance: horizontal offset of the hips from the midpoint of the feet.
+        let offsets = quiet.compactMap { sample -> Double? in
+            guard let lh = sample.joints[.leftHip], let rh = sample.joints[.rightHip],
+                  let la = sample.joints[.leftAnkle], let ra = sample.joints[.rightAnkle] else { return nil }
+            let hipMidX = (lh.x + rh.x) / 2
+            let ankleMidX = (la.x + ra.x) / 2
+            return Double(abs(hipMidX - ankleMidX)) / shoulderWidth
+        }
+        guard !quiet.isEmpty, Double(offsets.count) / Double(quiet.count) >= config.minJointVisibility else {
+            return ScanBreakdown.CategoryReport(
+                name: Category.positioning.rawValue, score: 0, metrics: [],
+                dataNote: "Hips and feet weren't visible enough to assess positioning."
+            )
+        }
+        let meanOffset = offsets.reduce(0, +) / Double(offsets.count)
+        let balanceScore = Int(linearScore(
+            meanOffset, target: config.balanceTargetOffset, floor: config.balanceFloorOffset, higherIsBetter: false
+        ).rounded())
+        return ScanBreakdown.CategoryReport(
+            name: Category.positioning.rawValue,
+            score: balanceScore,
+            metrics: [
+                ScanBreakdown.MetricValue(
+                    name: "Balance",
+                    value: String(format: "weight %.2f shoulder-widths off base on average", meanOffset),
+                    score: balanceScore
+                )
+            ],
+            dataNote: nil
+        )
+    }
+
+    private static func headMovementCategory(
+        reps: [Rep],
+        samples: [Sample],
+        shoulderWidth: Double,
+        config: Config,
+        findings: inout [ScanBreakdown.Finding]
+    ) -> ScanBreakdown.CategoryReport {
+        // Measured after punches: did the head leave the centerline?
+        let punches = reps.filter { $0.limb.isArm }
+        guard !punches.isEmpty else {
+            return ScanBreakdown.CategoryReport(
+                name: Category.headMovement.rawValue, score: 0, metrics: [],
+                dataNote: "No punches detected — head movement is assessed after punching."
+            )
+        }
+
+        var repScores: [Double] = []
+        for rep in punches {
+            let window = samples.filter { $0.time >= rep.peakTime + 0.1 && $0.time <= rep.peakTime + 0.9 }
+            // Head position relative to the hips, so stepping doesn't count as slipping.
+            let positions = window.compactMap { sample -> Double? in
+                guard let nose = sample.joints[.nose] ?? sample.joints[.neck],
+                      let lh = sample.joints[.leftHip], let rh = sample.joints[.rightHip] else { return nil }
+                return Double(nose.x - (lh.x + rh.x) / 2) / shoulderWidth
+            }
+            guard let minP = positions.min(), let maxP = positions.max() else { continue }
+            let displacement = maxP - minP
+            let score = linearScore(
+                displacement, target: config.headMoveTargetWidths, floor: config.headMoveFloorWidths, higherIsBetter: true
+            )
+            repScores.append(score)
+            if score < 40 {
+                findings.append(ScanBreakdown.Finding(
+                    id: UUID(), time: rep.peakTime, rule: "Head Movement",
+                    message: "Head stayed on the centerline after punching — slip or roll off the line",
+                    score: Int(score.rounded()), category: Category.headMovement.rawValue
+                ))
+            }
+        }
+
+        guard !repScores.isEmpty else {
+            return ScanBreakdown.CategoryReport(
+                name: Category.headMovement.rawValue, score: 0, metrics: [],
+                dataNote: "Head wasn't visible enough after punches to assess movement."
+            )
+        }
+        let average = repScores.reduce(0, +) / Double(repScores.count)
+        return ScanBreakdown.CategoryReport(
+            name: Category.headMovement.rawValue,
+            score: Int(average.rounded()),
+            metrics: [
+                ScanBreakdown.MetricValue(
+                    name: "Off-line after punching",
+                    value: "measured on \(repScores.count) punches",
+                    score: Int(average.rounded())
+                )
+            ],
+            dataNote: nil
+        )
     }
 
     // MARK: - Math

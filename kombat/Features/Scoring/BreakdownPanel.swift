@@ -10,6 +10,7 @@ import SwiftUI
 struct BreakdownPanel: View {
     let score: Int
     let breakdown: ScanBreakdown
+    let coaching: ScanCoaching?
     let onSeek: (Double) -> Void
 
     var body: some View {
@@ -49,25 +50,31 @@ struct BreakdownPanel: View {
                     }
                 }
 
-                ForEach(breakdown.ruleScores) { rule in
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Text(rule.rule)
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                            .frame(width: 80, alignment: .leading)
-                        GeometryReader { proxy in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Theme.Colors.surface)
-                                Capsule()
-                                    .fill(Theme.Colors.accent)
-                                    .frame(width: proxy.size.width * CGFloat(rule.score) / 100)
+                if let categories = breakdown.categories, !categories.isEmpty {
+                    ForEach(categories) { report in
+                        VStack(alignment: .leading, spacing: 4) {
+                            scoreBar(label: report.name, score: report.dataNote == nil ? report.score : nil)
+                            if let note = report.dataNote {
+                                Text(note)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(Theme.Colors.textTertiary)
+                            } else if let assessment = coaching?.categories.first(where: { $0.name == report.name })?.assessment {
+                                Text(assessment)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(Theme.Colors.textPrimary)
+                            } else {
+                                ForEach(report.metrics) { metric in
+                                    Text("\(metric.name): \(metric.value)")
+                                        .font(Theme.Typography.caption)
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                }
                             }
                         }
-                        .frame(height: 6)
-                        Text("\(rule.score)")
-                            .font(Theme.Typography.caption.monospacedDigit())
-                            .foregroundStyle(Theme.Colors.textPrimary)
-                            .frame(width: 30, alignment: .trailing)
+                        .padding(.bottom, Theme.Spacing.xs)
+                    }
+                } else {
+                    ForEach(breakdown.ruleScores) { rule in
+                        scoreBar(label: rule.rule, score: rule.score)
                     }
                 }
 
@@ -102,6 +109,31 @@ struct BreakdownPanel: View {
             .padding(Theme.Spacing.md)
         }
         .background(Theme.Colors.background)
+    }
+
+    @ViewBuilder
+    private func scoreBar(label: String, score: Int?) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Text(label)
+                .font(Theme.Typography.caption.weight(.semibold))
+                .foregroundStyle(Theme.Colors.textPrimary)
+                .frame(width: 110, alignment: .leading)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.Colors.surface)
+                    if let score {
+                        Capsule()
+                            .fill(Theme.Colors.accent)
+                            .frame(width: proxy.size.width * CGFloat(score) / 100)
+                    }
+                }
+            }
+            .frame(height: 6)
+            Text(score.map(String.init) ?? "—")
+                .font(Theme.Typography.caption.monospacedDigit())
+                .foregroundStyle(Theme.Colors.textPrimary)
+                .frame(width: 30, alignment: .trailing)
+        }
     }
 
     private func timeText(_ seconds: Double) -> String {

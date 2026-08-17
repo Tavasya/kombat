@@ -13,7 +13,7 @@ struct VideoView: View {
     @State private var isImporting = false
     @State private var isScoring = false
     @State private var importFailed = false
-    @State private var playingSession: ScanSession?
+    @State private var playingSessionID: PlayingSessionID?
 
     var body: some View {
         ScrollView {
@@ -93,8 +93,12 @@ struct VideoView: View {
             pickedVideo = nil
             importVideo(from: item)
         }
-        .sheet(item: $playingSession) { session in
-            ScanPlayerView(session: session)
+        .sheet(item: $playingSessionID) { wrapper in
+            // Look up live rather than capturing a snapshot, so the sheet
+            // picks up coaching/updates that land after it's already open.
+            if let session = scanRepository.scans.first(where: { $0.id == wrapper.id }) {
+                ScanPlayerView(session: session)
+            }
         }
         .alert("Couldn't import that video", isPresented: $importFailed) {
             Button("OK", role: .cancel) {}
@@ -108,7 +112,7 @@ struct VideoView: View {
         Group {
             if session.videoURL != nil {
                 Button {
-                    playingSession = session
+                    playingSessionID = PlayingSessionID(id: session.id)
                 } label: {
                     ScanHistoryRow(session: session)
                 }
@@ -178,6 +182,10 @@ struct VideoView: View {
             )
         }
     }
+}
+
+private struct PlayingSessionID: Identifiable {
+    let id: UUID
 }
 
 #Preview {

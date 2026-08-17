@@ -18,6 +18,27 @@ struct ScanBreakdown: Codable, Equatable {
     /// What was thrown, per auto-classified technique. Optional because
     /// engine-v1 rows predate classification.
     let techniques: [TechniqueCount]?
+    /// Per-category assessment (Striking, Blocking, Footwork, Positioning,
+    /// Head Movement). Optional because pre-v3 rows predate categories.
+    let categories: [CategoryReport]?
+
+    struct CategoryReport: Codable, Equatable, Identifiable {
+        let name: String
+        let score: Int
+        /// The measurements behind the score, ready to feed an LLM or display.
+        let metrics: [MetricValue]
+        /// Set when this category couldn't be measured reliably (e.g. feet
+        /// out of frame) — the honest alternative to a made-up score.
+        let dataNote: String?
+        var id: String { name }
+    }
+
+    struct MetricValue: Codable, Equatable, Identifiable {
+        let name: String
+        let value: String
+        let score: Int
+        var id: String { name }
+    }
 
     struct TechniqueCount: Codable, Equatable, Identifiable {
         let technique: String
@@ -39,5 +60,7 @@ struct ScanBreakdown: Codable, Equatable {
         let rule: String
         let message: String
         let score: Int
+        /// Which category this belongs to; optional on pre-v3 rows.
+        let category: String?
     }
 }
