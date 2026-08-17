@@ -64,12 +64,20 @@ struct ScanPlayerView: View {
             currentPoses = poseFrames.last(where: { $0.time <= seconds + 0.05 })?.poses ?? []
         }
 
+        // Analysis runs once per video; later opens load the cached timeline.
+        if let name = session.videoFileName, let cached = PoseCache.load(for: name) {
+            poseFrames = cached
+            return
+        }
         isAnalyzing = true
         analysisTask = Task {
             let frames = (try? await PoseAnalyzer.analyze(videoURL: url)) ?? []
             if !Task.isCancelled {
                 poseFrames = frames
                 isAnalyzing = false
+                if let name = session.videoFileName, !frames.isEmpty {
+                    PoseCache.save(frames, for: name)
+                }
             }
         }
     }
