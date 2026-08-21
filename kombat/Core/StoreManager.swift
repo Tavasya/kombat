@@ -79,12 +79,27 @@ final class StoreManager: ObservableObject {
 
     private func refreshEntitlements() async {
         var subscribed = false
+        var entitlementCount = 0
+        var verificationFailures = 0
+        var seenProductIDs: [String] = []
+
         for await result in Transaction.currentEntitlements {
-            if let transaction = try? checkVerified(result), transaction.productID == Self.monthlyProductID {
-                subscribed = true
+            entitlementCount += 1
+            do {
+                let transaction = try checkVerified(result)
+                seenProductIDs.append(transaction.productID)
+                if transaction.productID == Self.monthlyProductID {
+                    subscribed = true
+                }
+            } catch {
+                verificationFailures += 1
             }
         }
+
         isSubscribed = subscribed
+        #if DEBUG
+        print("[StoreManager] refreshEntitlements: \(entitlementCount) entitlement(s), \(verificationFailures) failed verification, productIDs seen: \(seenProductIDs), expecting: \(Self.monthlyProductID), isSubscribed: \(subscribed)")
+        #endif
     }
 
     private func listenForTransactionUpdates() -> Task<Void, Never> {
