@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 enum AppFlow {
     case landing
