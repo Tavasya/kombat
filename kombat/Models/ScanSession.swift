@@ -21,12 +21,13 @@ enum StrikeCategory: String, Codable, CaseIterable {
     }
 }
 
-/// One row of the Supabase `scans` table. Scan metadata lives in the cloud;
-/// the video file itself stays on the device that captured it.
+/// One row of the Supabase `log_entries` table. Scan metadata lives in the
+/// cloud; the video file itself stays on the device that captured it.
 struct ScanSession: Identifiable, Codable, Equatable {
     let id: UUID
     let userID: UUID
     let date: Date
+    let title: String
     let category: StrikeCategory
     let formScore: Int
     let durationSeconds: Int
@@ -41,6 +42,7 @@ struct ScanSession: Identifiable, Codable, Equatable {
         case id
         case userID = "user_id"
         case date = "created_at"
+        case title
         case category
         case formScore = "form_score"
         case durationSeconds = "duration_seconds"

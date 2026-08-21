@@ -20,7 +20,7 @@ final class ScanRepository: ObservableObject {
         isLoading = scans.isEmpty
         defer { isLoading = false }
         do {
-            scans = try await client.from("scans")
+            scans = try await client.from("log_entries")
                 .select()
                 .order("created_at", ascending: false)
                 .execute()
@@ -51,13 +51,14 @@ final class ScanRepository: ObservableObject {
                 id: UUID(),
                 userID: userID,
                 date: .now,
+                title: "\(category.rawValue) Scan",
                 category: category,
                 formScore: formScore,
                 durationSeconds: durationSeconds,
                 videoFileName: fileName,
                 breakdown: breakdown
             )
-            try await client.from("scans").insert(scan).execute()
+            try await client.from("log_entries").insert(scan).execute()
             scans.insert(scan, at: 0)
             errorMessage = nil
             if let breakdown {
@@ -72,7 +73,7 @@ final class ScanRepository: ObservableObject {
     private func generateCoaching(for scan: ScanSession, breakdown: ScanBreakdown) async {
         guard let coaching = try? await CoachingClient.generate(from: breakdown) else { return }
         do {
-            try await client.from("scans").update(["coaching": coaching]).eq("id", value: scan.id).execute()
+            try await client.from("log_entries").update(["coaching": coaching]).eq("id", value: scan.id).execute()
             if let index = scans.firstIndex(where: { $0.id == scan.id }) {
                 scans[index].coaching = coaching
             }
@@ -84,7 +85,7 @@ final class ScanRepository: ObservableObject {
     /// Removes the scan row and, if this device holds the video, the file too.
     func delete(_ scan: ScanSession) async {
         do {
-            try await client.from("scans").delete().eq("id", value: scan.id).execute()
+            try await client.from("log_entries").delete().eq("id", value: scan.id).execute()
             if let name = scan.videoFileName {
                 ScanVideoStore.deleteVideo(named: name)
                 PoseCache.delete(for: name)
