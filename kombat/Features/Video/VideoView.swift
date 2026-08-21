@@ -7,36 +7,33 @@ import PhotosUI
 import SwiftUI
 
 struct VideoView: View {
-    @StateObject private var camera = CameraService()
     @EnvironmentObject private var scanRepository: ScanRepository
     @State private var pickedVideo: PhotosPickerItem?
     @State private var isImporting = false
     @State private var isScoring = false
     @State private var importFailed = false
     @State private var playingSessionID: PlayingSessionID?
+    @State private var showSourceMenu = false
+    @State private var showCamera = false
+    @State private var showPhotosPicker = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.lg) {
-                ScanCameraCard(camera: camera)
-
-                RecordButton(isRecording: recordingBinding)
-
-                Text(statusText)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Colors.textSecondary)
-
-                PhotosPicker(selection: $pickedVideo, matching: .videos) {
+                Button {
+                    showSourceMenu = true
+                } label: {
                     HStack(spacing: Theme.Spacing.sm) {
                         if isImporting {
                             ProgressView()
                         } else {
-                            Image(systemName: "square.and.arrow.up")
+                            Image(systemName: "plus.circle.fill")
                         }
-                        Text(isImporting ? "Importing…" : "Upload a Video")
+                        Text(isImporting ? "Importing…" : "New Scan")
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(SecondaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle())
                 .disabled(isImporting)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -82,16 +79,21 @@ struct VideoView: View {
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationTitle("Video")
-        .onAppear { camera.start() }
-        .onDisappear { camera.stop() }
-        .onChange(of: camera.lastRecording?.id) {
-            guard let recording = camera.lastRecording else { return }
-            logScan(durationSeconds: recording.durationSeconds, videoURL: recording.url)
-        }
         .onChange(of: pickedVideo) {
             guard let item = pickedVideo else { return }
             pickedVideo = nil
             importVideo(from: item)
+        }
+        .confirmationDialog("New Scan", isPresented: $showSourceMenu, titleVisibility: .hidden) {
+            Button("Record Video") { showCamera = true }
+            Button("Choose from Library") { showPhotosPicker = true }
+            Button("Cancel", role: .cancel) {}
+        }
+        .photosPicker(isPresented: $showPhotosPicker, selection: $pickedVideo, matching: .videos)
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraCaptureView { url, durationSeconds in
+                logScan(durationSeconds: durationSeconds, videoURL: url)
+            }
         }
         .sheet(item: $playingSessionID) { wrapper in
             // Look up live rather than capturing a snapshot, so the sheet
@@ -127,26 +129,6 @@ struct VideoView: View {
             } label: {
                 Label("Delete Scan", systemImage: "trash")
             }
-        }
-    }
-
-    private var recordingBinding: Binding<Bool> {
-        Binding(
-            get: { camera.isRecording },
-            set: { _ in camera.toggleRecording() }
-        )
-    }
-
-    private var statusText: String {
-        switch camera.status {
-        case .ready:
-            return camera.isRecording ? "Recording…" : "Tap to record, or upload from your library"
-        case .denied:
-            return "Camera permission needed — you can still upload a video"
-        case .failed:
-            return "Camera unavailable — you can still upload a video"
-        case .idle, .requestingPermission:
-            return "Preparing camera…"
         }
     }
 
