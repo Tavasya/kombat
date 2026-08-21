@@ -25,7 +25,7 @@ final class StoreManager: ObservableObject {
         updatesTask = listenForTransactionUpdates()
         Task {
             await loadProduct()
-            await refreshEntitlements()
+            await refreshEntitlementsWithSyncFallback()
         }
     }
 
@@ -69,10 +69,22 @@ final class StoreManager: ObservableObject {
         }
         // Always re-check, even on failure: an "already subscribed" error, for
         // instance, means there's a real entitlement we just weren't reflecting yet.
-        await refreshEntitlements()
+        await refreshEntitlementsWithSyncFallback()
     }
 
     func restorePurchases() async {
+        try? await AppStore.sync()
+        await refreshEntitlements()
+    }
+
+    /// Transaction.currentEntitlements reads a local cache that can lag behind a
+    /// real purchase — especially with local StoreKit testing on a real device,
+    /// where it can come back completely empty even right after a successful
+    /// purchase. If the fast path finds nothing, force a sync with the App
+    /// Store and check once more before giving up.
+    private func refreshEntitlementsWithSyncFallback() async {
+        await refreshEntitlements()
+        guard !isSubscribed else { return }
         try? await AppStore.sync()
         await refreshEntitlements()
     }
