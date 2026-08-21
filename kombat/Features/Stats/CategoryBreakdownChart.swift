@@ -7,7 +7,7 @@ import SwiftUI
 import Charts
 
 struct CategoryBreakdownChart: View {
-    let categories: [ScanRepository.CategoryAverage]
+    let categories: [LogRepository.CategoryAverage]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {

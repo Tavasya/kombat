@@ -8,13 +8,13 @@ import SwiftUI
 struct HomeView: View {
     let onStartScan: () -> Void
 
-    @EnvironmentObject private var scanRepository: ScanRepository
+    @EnvironmentObject private var logRepository: LogRepository
     @EnvironmentObject private var appState: AppState
 
     private var displayName: String {
         appState.userEmail.split(separator: "@").first.map(String.init) ?? "there"
     }
-    private var sessions: [ScanSession] { Array(scanRepository.scans.prefix(5)) }
+    private var sessions: [LogEntry] { Array(logRepository.entries.prefix(5)) }
 
     private let breakdownColumns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -31,15 +31,15 @@ struct HomeView: View {
                 }
 
                 WeekStreakCard(
-                    weekdayActivity: scanRepository.weekdayActivity,
-                    streakDays: scanRepository.streakDays
+                    weekdayActivity: logRepository.weekdayActivity,
+                    streakDays: logRepository.streakDays
                 )
 
                 LazyVGrid(columns: breakdownColumns, spacing: Theme.Spacing.sm) {
-                    StatChip(value: "\(scanRepository.sessionsThisWeek)", label: "This Week", systemImage: "calendar")
-                    StatChip(value: "\(scanRepository.sessionsThisMonth)", label: "This Month", systemImage: "calendar.badge.clock")
-                    StatChip(value: "\(scanRepository.scans.count)", label: "All-Time", systemImage: "list.bullet")
-                    StatChip(value: "\(scanRepository.averageScore)", label: "Avg Score", systemImage: "chart.line.uptrend.xyaxis")
+                    StatChip(value: "\(logRepository.sessionsThisWeek)", label: "This Week", systemImage: "calendar")
+                    StatChip(value: "\(logRepository.sessionsThisMonth)", label: "This Month", systemImage: "calendar.badge.clock")
+                    StatChip(value: "\(logRepository.entries.count)", label: "All-Time", systemImage: "list.bullet")
+                    StatChip(value: "\(logRepository.averageScore)", label: "Avg Score", systemImage: "chart.line.uptrend.xyaxis")
                 }
 
                 Button(action: onStartScan) {
@@ -100,6 +100,6 @@ struct HomeView: View {
     NavigationStack {
         HomeView(onStartScan: {})
     }
-    .environmentObject(ScanRepository())
+    .environmentObject(LogRepository())
     .environmentObject(AppState())
 }

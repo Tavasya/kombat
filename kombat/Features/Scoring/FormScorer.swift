@@ -179,7 +179,7 @@ enum FormScorer {
     static func score(
         frames: [PoseFrame],
         config: Config = Config()
-    ) -> (score: Int, category: StrikeCategory, breakdown: ScanBreakdown) {
+    ) -> (score: Int, category: StrikeCategory, breakdown: AnalysisBreakdown) {
         let samples = primaryPersonSamples(from: frames)
         guard samples.count >= 10 else {
             return empty(note: "No person was detected in this video.")
@@ -202,7 +202,7 @@ enum FormScorer {
         let discipline = guardDiscipline(samples: samples, reps: reps, shoulderWidth: shoulderWidth, config: config)
 
         // Roll up.
-        var findings: [ScanBreakdown.Finding] = []
+        var findings: [AnalysisBreakdown.Finding] = []
         var repScores: [Double] = []
         for rep in reps {
             let weights = weightsFor(rep.technique, config: config)
@@ -211,7 +211,7 @@ enum FormScorer {
             let weighted = rep.ruleScores.reduce(0.0) { $0 + $1.value * (weights[$1.key] ?? 0) } / totalWeight
             repScores.append(weighted)
             if let worst = rep.ruleScores.min(by: { $0.value < $1.value }), worst.value < 70 {
-                findings.append(ScanBreakdown.Finding(
+                findings.append(AnalysisBreakdown.Finding(
                     id: UUID(),
                     time: rep.peakTime,
                     rule: worst.key.rawValue,
@@ -231,9 +231,9 @@ enum FormScorer {
             }
         }
         var ruleScores = ruleTotals.map { rule, entry in
-            ScanBreakdown.RuleScore(rule: rule.rawValue, score: Int((entry.sum / Double(entry.count)).rounded()))
+            AnalysisBreakdown.RuleScore(rule: rule.rawValue, score: Int((entry.sum / Double(entry.count)).rounded()))
         }.sorted { $0.rule < $1.rule }
-        ruleScores.append(ScanBreakdown.RuleScore(rule: Rule.guardDiscipline.rawValue, score: discipline.score))
+        ruleScores.append(AnalysisBreakdown.RuleScore(rule: Rule.guardDiscipline.rawValue, score: discipline.score))
 
         // Per-technique summary.
         var byTechnique: [Technique: [Double]] = [:]
@@ -241,7 +241,7 @@ enum FormScorer {
             byTechnique[rep.technique, default: []].append(score)
         }
         let techniques = byTechnique.map { technique, scores in
-            ScanBreakdown.TechniqueCount(
+            AnalysisBreakdown.TechniqueCount(
                 technique: technique.rawValue,
                 count: scores.count,
                 averageScore: Int((scores.reduce(0, +) / Double(scores.count)).rounded())
@@ -250,13 +250,13 @@ enum FormScorer {
 
         // Assemble the five category reports.
         let repAverage = repScores.isEmpty ? 0 : repScores.reduce(0, +) / Double(repScores.count)
-        let striking = ScanBreakdown.CategoryReport(
+        let striking = AnalysisBreakdown.CategoryReport(
             name: Category.striking.rawValue,
             score: Int(repAverage.rounded()),
             metrics: [
-                ScanBreakdown.MetricValue(name: "Strikes analyzed", value: "\(reps.count)", score: Int(repAverage.rounded()))
+                AnalysisBreakdown.MetricValue(name: "Strikes analyzed", value: "\(reps.count)", score: Int(repAverage.rounded()))
             ] + ruleScores.filter { $0.rule != Rule.guardDiscipline.rawValue }.map {
-                ScanBreakdown.MetricValue(name: $0.rule, value: "\($0.score)/100", score: $0.score)
+                AnalysisBreakdown.MetricValue(name: $0.rule, value: "\($0.score)/100", score: $0.score)
             },
             dataNote: nil
         )
@@ -265,16 +265,16 @@ enum FormScorer {
         let checkAverage = checkScores.isEmpty ? nil : checkScores.reduce(0, +) / Double(checkScores.count)
         let blockingScore = checkAverage.map { Int((Double(discipline.score) * 0.6 + $0 * 0.4).rounded()) } ?? discipline.score
         var blockingMetrics = [
-            ScanBreakdown.MetricValue(name: "Guard held between strikes", value: "\(discipline.score)% of the time", score: discipline.score)
+            AnalysisBreakdown.MetricValue(name: "Guard held between strikes", value: "\(discipline.score)% of the time", score: discipline.score)
         ]
         if let checkAverage {
-            blockingMetrics.append(ScanBreakdown.MetricValue(name: "Checks", value: "\(checkScores.count) thrown", score: Int(checkAverage.rounded())))
+            blockingMetrics.append(AnalysisBreakdown.MetricValue(name: "Checks", value: "\(checkScores.count) thrown", score: Int(checkAverage.rounded())))
         }
-        let blocking = ScanBreakdown.CategoryReport(
+        let blocking = AnalysisBreakdown.CategoryReport(
             name: Category.blocking.rawValue, score: blockingScore, metrics: blockingMetrics, dataNote: nil
         )
 
-        var intervalFindings: [ScanBreakdown.Finding] = []
+        var intervalFindings: [AnalysisBreakdown.Finding] = []
         let quiet = quietSamples(samples: samples, reps: reps, config: config)
         let footwork = footworkCategory(quiet: quiet, samples: samples, shoulderWidth: shoulderWidth, config: config, findings: &intervalFindings)
         let positioning = positioningCategory(quiet: quiet, shoulderWidth: shoulderWidth, config: config)
@@ -292,7 +292,7 @@ enum FormScorer {
         }
         let overall = weightSum > 0 ? Int((weighted / weightSum).rounded()) : Int(repAverage.rounded())
 
-        let breakdown = ScanBreakdown(
+        let breakdown = AnalysisBreakdown(
             engineVersion: engineVersion,
             repCount: reps.count,
             note: nil,
@@ -304,8 +304,8 @@ enum FormScorer {
         return (overall, derivedCategory(reps: reps), breakdown)
     }
 
-    private static func empty(note: String) -> (score: Int, category: StrikeCategory, breakdown: ScanBreakdown) {
-        (0, .combo, ScanBreakdown(engineVersion: engineVersion, repCount: 0, note: note, ruleScores: [], findings: [], techniques: [], categories: []))
+    private static func empty(note: String) -> (score: Int, category: StrikeCategory, breakdown: AnalysisBreakdown) {
+        (0, .combo, AnalysisBreakdown(engineVersion: engineVersion, repCount: 0, note: note, ruleScores: [], findings: [], techniques: [], categories: []))
     }
 
     /// The scan's category label is derived from what was actually thrown.
@@ -590,7 +590,7 @@ enum FormScorer {
         reps: [Rep],
         shoulderWidth: Double,
         config: Config
-    ) -> (score: Int, findings: [ScanBreakdown.Finding]) {
+    ) -> (score: Int, findings: [AnalysisBreakdown.Finding]) {
         // Only judge the stretches between strikes.
         let isStriking: (Double) -> Bool = { time in
             reps.contains { abs($0.peakTime - time) < config.repWindowAfter }
@@ -599,11 +599,11 @@ enum FormScorer {
         var judged = 0
         var up = 0
         var lapseStart: Double?
-        var findings: [ScanBreakdown.Finding] = []
+        var findings: [AnalysisBreakdown.Finding] = []
 
         func closeLapse(at time: Double) {
             if let start = lapseStart, time - start >= config.disciplineLapseSeconds {
-                findings.append(ScanBreakdown.Finding(
+                findings.append(AnalysisBreakdown.Finding(
                     id: UUID(),
                     time: start,
                     rule: Rule.guardDiscipline.rawValue,
@@ -649,12 +649,12 @@ enum FormScorer {
         samples: [Sample],
         shoulderWidth: Double,
         config: Config,
-        findings: inout [ScanBreakdown.Finding]
-    ) -> ScanBreakdown.CategoryReport {
+        findings: inout [AnalysisBreakdown.Finding]
+    ) -> AnalysisBreakdown.CategoryReport {
         // Both ankles must be visible often enough to say anything honest.
         let visible = quiet.filter { $0.joints[.leftAnkle] != nil && $0.joints[.rightAnkle] != nil }
         guard !quiet.isEmpty, Double(visible.count) / Double(quiet.count) >= config.minJointVisibility else {
-            return ScanBreakdown.CategoryReport(
+            return AnalysisBreakdown.CategoryReport(
                 name: Category.footwork.rawValue, score: 0, metrics: [],
                 dataNote: "Feet weren't visible enough to assess footwork — film with your full body in frame."
             )
@@ -690,7 +690,7 @@ enum FormScorer {
                 if plantedStart == nil { plantedStart = entry.time }
             } else {
                 if let start = plantedStart, entry.time - start >= config.plantedLapseSeconds {
-                    findings.append(ScanBreakdown.Finding(
+                    findings.append(AnalysisBreakdown.Finding(
                         id: UUID(), time: start, rule: "Mobility",
                         message: "Feet stayed planted — keep moving between strikes",
                         score: mobilityScore, category: Category.footwork.rawValue
@@ -701,12 +701,12 @@ enum FormScorer {
         }
 
         let score = (stanceScore + mobilityScore) / 2
-        return ScanBreakdown.CategoryReport(
+        return AnalysisBreakdown.CategoryReport(
             name: Category.footwork.rawValue,
             score: score,
             metrics: [
-                ScanBreakdown.MetricValue(name: "Stance width", value: "in range \(stanceScore)% of the time", score: stanceScore),
-                ScanBreakdown.MetricValue(name: "Mobility", value: "moving \(Int((mobilityRatio * 100).rounded()))% of the time", score: mobilityScore)
+                AnalysisBreakdown.MetricValue(name: "Stance width", value: "in range \(stanceScore)% of the time", score: stanceScore),
+                AnalysisBreakdown.MetricValue(name: "Mobility", value: "moving \(Int((mobilityRatio * 100).rounded()))% of the time", score: mobilityScore)
             ],
             dataNote: nil
         )
@@ -716,7 +716,7 @@ enum FormScorer {
         quiet: [Sample],
         shoulderWidth: Double,
         config: Config
-    ) -> ScanBreakdown.CategoryReport {
+    ) -> AnalysisBreakdown.CategoryReport {
         // Balance: horizontal offset of the hips from the midpoint of the feet.
         let offsets = quiet.compactMap { sample -> Double? in
             guard let lh = sample.joints[.leftHip], let rh = sample.joints[.rightHip],
@@ -726,7 +726,7 @@ enum FormScorer {
             return Double(abs(hipMidX - ankleMidX)) / shoulderWidth
         }
         guard !quiet.isEmpty, Double(offsets.count) / Double(quiet.count) >= config.minJointVisibility else {
-            return ScanBreakdown.CategoryReport(
+            return AnalysisBreakdown.CategoryReport(
                 name: Category.positioning.rawValue, score: 0, metrics: [],
                 dataNote: "Hips and feet weren't visible enough to assess positioning."
             )
@@ -735,11 +735,11 @@ enum FormScorer {
         let balanceScore = Int(linearScore(
             meanOffset, target: config.balanceTargetOffset, floor: config.balanceFloorOffset, higherIsBetter: false
         ).rounded())
-        return ScanBreakdown.CategoryReport(
+        return AnalysisBreakdown.CategoryReport(
             name: Category.positioning.rawValue,
             score: balanceScore,
             metrics: [
-                ScanBreakdown.MetricValue(
+                AnalysisBreakdown.MetricValue(
                     name: "Balance",
                     value: String(format: "weight %.2f shoulder-widths off base on average", meanOffset),
                     score: balanceScore
@@ -754,12 +754,12 @@ enum FormScorer {
         samples: [Sample],
         shoulderWidth: Double,
         config: Config,
-        findings: inout [ScanBreakdown.Finding]
-    ) -> ScanBreakdown.CategoryReport {
+        findings: inout [AnalysisBreakdown.Finding]
+    ) -> AnalysisBreakdown.CategoryReport {
         // Measured after punches: did the head leave the centerline?
         let punches = reps.filter { $0.limb.isArm }
         guard !punches.isEmpty else {
-            return ScanBreakdown.CategoryReport(
+            return AnalysisBreakdown.CategoryReport(
                 name: Category.headMovement.rawValue, score: 0, metrics: [],
                 dataNote: "No punches detected — head movement is assessed after punching."
             )
@@ -781,7 +781,7 @@ enum FormScorer {
             )
             repScores.append(score)
             if score < 40 {
-                findings.append(ScanBreakdown.Finding(
+                findings.append(AnalysisBreakdown.Finding(
                     id: UUID(), time: rep.peakTime, rule: "Head Movement",
                     message: "Head stayed on the centerline after punching — slip or roll off the line",
                     score: Int(score.rounded()), category: Category.headMovement.rawValue
@@ -790,17 +790,17 @@ enum FormScorer {
         }
 
         guard !repScores.isEmpty else {
-            return ScanBreakdown.CategoryReport(
+            return AnalysisBreakdown.CategoryReport(
                 name: Category.headMovement.rawValue, score: 0, metrics: [],
                 dataNote: "Head wasn't visible enough after punches to assess movement."
             )
         }
         let average = repScores.reduce(0, +) / Double(repScores.count)
-        return ScanBreakdown.CategoryReport(
+        return AnalysisBreakdown.CategoryReport(
             name: Category.headMovement.rawValue,
             score: Int(average.rounded()),
             metrics: [
-                ScanBreakdown.MetricValue(
+                AnalysisBreakdown.MetricValue(
                     name: "Off-line after punching",
                     value: "measured on \(repScores.count) punches",
                     score: Int(average.rounded())

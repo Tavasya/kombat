@@ -1,5 +1,5 @@
 //
-//  ScanSession.swift
+//  LogEntry.swift
 //  kombat
 //
 
@@ -21,28 +21,45 @@ enum StrikeCategory: String, Codable, CaseIterable {
     }
 }
 
-/// One row of the Supabase `log_entries` table. Scan metadata lives in the
-/// cloud; the video file itself stays on the device that captured it.
-struct ScanSession: Identifiable, Codable, Equatable {
+/// One row of the Supabase `log_entries` table. A logged training session —
+/// video, name, and date — exists independently of analysis; the entry only
+/// gets a category/score/breakdown once its `status` reaches `.analyzed`.
+/// Log metadata lives in the cloud; the video file itself stays on the
+/// device that captured it.
+struct LogEntry: Identifiable, Codable, Equatable {
+    enum Status: String, Codable {
+        case pending
+        case analyzing
+        case analyzed
+        case failed
+    }
+
     let id: UUID
     let userID: UUID
-    let date: Date
-    let title: String
-    let category: StrikeCategory
-    let formScore: Int
+    let createdAt: Date
+    /// The date the user says this session happened — editable at log time,
+    /// distinct from `createdAt` which is just when the row was inserted.
+    var sessionDate: Date
+    var title: String
+    var status: Status
+    /// Set once analysis completes; nil for a freshly logged, unanalyzed entry.
+    var category: StrikeCategory?
+    var formScore: Int?
     let durationSeconds: Int
-    /// File name in `ScanVideoStore` on the capturing device; the bytes never upload.
+    /// File name in `LogVideoStore` on the capturing device; the bytes never upload.
     let videoFileName: String?
-    /// Per-rule scoring evidence; nil for scans made before the scoring engine.
-    let breakdown: ScanBreakdown?
+    /// Per-rule scoring evidence; nil until analyzed.
+    var breakdown: AnalysisBreakdown?
     /// LLM coaching prose derived from the breakdown; nil until generated.
-    var coaching: ScanCoaching?
+    var coaching: AnalysisCoaching?
 
     enum CodingKeys: String, CodingKey {
         case id
         case userID = "user_id"
-        case date = "created_at"
+        case createdAt = "created_at"
+        case sessionDate = "session_date"
         case title
+        case status
         case category
         case formScore = "form_score"
         case durationSeconds = "duration_seconds"
@@ -51,11 +68,11 @@ struct ScanSession: Identifiable, Codable, Equatable {
         case coaching
     }
 
-    /// Playable URL if this device still has the file (scans from other
+    /// Playable URL if this device still has the file (entries from other
     /// devices, or after the file was cleaned up, aren't playable).
     var videoURL: URL? {
         guard let videoFileName else { return nil }
-        let url = ScanVideoStore.url(for: videoFileName)
+        let url = LogVideoStore.url(for: videoFileName)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 

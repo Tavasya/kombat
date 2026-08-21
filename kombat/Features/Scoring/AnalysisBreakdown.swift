@@ -1,14 +1,14 @@
 //
-//  ScanBreakdown.swift
+//  AnalysisBreakdown.swift
 //  kombat
 //
 
 import Foundation
 
-/// The evidence behind a scan's form score: per-rule averages and the
-/// specific timestamped moments where form broke down. Stored on the scan
+/// The evidence behind a log entry's form score: per-rule averages and the
+/// specific timestamped moments where form broke down. Stored on the entry's
 /// row in Supabase, stamped with the engine version that produced it.
-struct ScanBreakdown: Codable, Equatable {
+struct AnalysisBreakdown: Codable, Equatable {
     let engineVersion: Int
     let repCount: Int
     /// Set when there was nothing to score (no person / no punches detected).

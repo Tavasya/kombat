@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct StatsView: View {
-    @EnvironmentObject private var scanRepository: ScanRepository
+    @EnvironmentObject private var logRepository: LogRepository
     @State private var selectedRange: StatsRange = .month
 
     var body: some View {
@@ -21,15 +21,15 @@ struct StatsView: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
 
-                if scanRepository.scans.isEmpty {
+                if logRepository.entries.isEmpty {
                     emptyState
                 } else {
                     HeroScoreCard(
-                        averageScore: scanRepository.averageScore,
-                        delta: scanRepository.monthOverMonthDelta
+                        averageScore: logRepository.averageScore,
+                        delta: logRepository.monthOverMonthDelta
                     )
 
-                    if let focusCategory = scanRepository.focusCategory {
+                    if let focusCategory = logRepository.focusCategory {
                         FocusAreaCard(category: focusCategory)
                     }
 
@@ -40,11 +40,11 @@ struct StatsView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    FormScoreTrendChart(points: scanRepository.trendPoints(for: selectedRange))
-                    SessionsCompletedChart(weeks: scanRepository.recentWeeklySessionCounts)
+                    FormScoreTrendChart(points: logRepository.trendPoints(for: selectedRange))
+                    SessionsCompletedChart(weeks: logRepository.recentWeeklySessionCounts)
 
-                    if !scanRepository.categoryAverages.isEmpty {
-                        CategoryBreakdownChart(categories: scanRepository.categoryAverages)
+                    if !logRepository.categoryAverages.isEmpty {
+                        CategoryBreakdownChart(categories: logRepository.categoryAverages)
                     }
                 }
             }
@@ -77,5 +77,5 @@ struct StatsView: View {
     NavigationStack {
         StatsView()
     }
-    .environmentObject(ScanRepository())
+    .environmentObject(LogRepository())
 }

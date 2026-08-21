@@ -1,21 +1,21 @@
 //
-//  VideoView.swift
+//  TrainingLogView.swift
 //  kombat
 //
 
 import PhotosUI
 import SwiftUI
 
-struct VideoView: View {
-    @EnvironmentObject private var scanRepository: ScanRepository
+struct TrainingLogView: View {
+    @EnvironmentObject private var logRepository: LogRepository
     @State private var pickedVideo: PhotosPickerItem?
     @State private var isImporting = false
-    @State private var isScoring = false
     @State private var importFailed = false
-    @State private var playingSessionID: PlayingSessionID?
+    @State private var openEntry: EntryIDWrapper?
     @State private var showSourceMenu = false
     @State private var showCamera = false
     @State private var showPhotosPicker = false
+    @State private var pendingVideo: PendingVideo?
 
     var body: some View {
         ScrollView {
@@ -29,7 +29,7 @@ struct VideoView: View {
                         } else {
                             Image(systemName: "plus.circle.fill")
                         }
-                        Text(isImporting ? "Importing…" : "New Scan")
+                        Text(isImporting ? "Importing…" : "Log Shadowbox")
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -37,39 +37,28 @@ struct VideoView: View {
                 .disabled(isImporting)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    SectionHeader(title: "Past Scans")
+                    SectionHeader(title: "Training Log")
 
-                    if isScoring {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            ProgressView()
-                            Text("Analyzing and scoring your scan…")
-                                .font(Theme.Typography.caption)
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(Theme.Spacing.sm)
-                    }
-
-                    if let message = scanRepository.errorMessage {
+                    if let message = logRepository.errorMessage {
                         Text(message)
                             .font(Theme.Typography.caption)
                             .foregroundStyle(Theme.Colors.scoreLow)
                     }
 
-                    if scanRepository.isLoading {
+                    if logRepository.isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(Theme.Spacing.lg)
-                    } else if scanRepository.scans.isEmpty {
-                        Text("No scans yet — record or upload your first one.")
+                    } else if logRepository.entries.isEmpty {
+                        Text("No sessions logged yet — record or upload your first one.")
                             .font(Theme.Typography.caption)
                             .foregroundStyle(Theme.Colors.textTertiary)
                             .frame(maxWidth: .infinity)
                             .padding(Theme.Spacing.lg)
                     } else {
                         LazyVStack(spacing: Theme.Spacing.sm) {
-                            ForEach(scanRepository.scans) { session in
-                                scanRow(session)
+                            ForEach(logRepository.entries) { entry in
+                                entryRow(entry)
                             }
                         }
                     }
@@ -78,13 +67,13 @@ struct VideoView: View {
             .padding(Theme.Spacing.lg)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
-        .navigationTitle("Video")
+        .navigationTitle("Log")
         .onChange(of: pickedVideo) {
             guard let item = pickedVideo else { return }
             pickedVideo = nil
             importVideo(from: item)
         }
-        .confirmationDialog("New Scan", isPresented: $showSourceMenu, titleVisibility: .hidden) {
+        .confirmationDialog("Log Shadowbox", isPresented: $showSourceMenu, titleVisibility: .hidden) {
             Button("Record Video") { showCamera = true }
             Button("Choose from Library") { showPhotosPicker = true }
             Button("Cancel", role: .cancel) {}
@@ -92,15 +81,23 @@ struct VideoView: View {
         .photosPicker(isPresented: $showPhotosPicker, selection: $pickedVideo, matching: .videos)
         .fullScreenCover(isPresented: $showCamera) {
             CameraCaptureView { url, durationSeconds in
-                logScan(durationSeconds: durationSeconds, videoURL: url)
+                pendingVideo = PendingVideo(url: url, durationSeconds: durationSeconds)
             }
         }
-        .sheet(item: $playingSessionID) { wrapper in
-            // Look up live rather than capturing a snapshot, so the sheet
-            // picks up coaching/updates that land after it's already open.
-            if let session = scanRepository.scans.first(where: { $0.id == wrapper.id }) {
-                ScanPlayerView(session: session)
+        .sheet(item: $pendingVideo) { pending in
+            LogEntryFormView(videoURL: pending.url, durationSeconds: pending.durationSeconds) { title, sessionDate in
+                Task {
+                    await logRepository.logEntry(
+                        title: title,
+                        sessionDate: sessionDate,
+                        durationSeconds: pending.durationSeconds,
+                        videoTempURL: pending.url
+                    )
+                }
             }
+        }
+        .sheet(item: $openEntry) { wrapper in
+            LogEntryDetailView(entryID: wrapper.id)
         }
         .alert("Couldn't import that video", isPresented: $importFailed) {
             Button("OK", role: .cancel) {}
@@ -110,24 +107,24 @@ struct VideoView: View {
     }
 
     @ViewBuilder
-    private func scanRow(_ session: ScanSession) -> some View {
+    private func entryRow(_ entry: LogEntry) -> some View {
         Group {
-            if session.videoURL != nil {
+            if entry.videoURL != nil {
                 Button {
-                    playingSessionID = PlayingSessionID(id: session.id)
+                    openEntry = EntryIDWrapper(id: entry.id)
                 } label: {
-                    ScanHistoryRow(session: session)
+                    LogEntryRow(entry: entry)
                 }
                 .buttonStyle(.plain)
             } else {
-                ScanHistoryRow(session: session)
+                LogEntryRow(entry: entry)
             }
         }
         .contextMenu {
             Button(role: .destructive) {
-                Task { await scanRepository.delete(session) }
+                Task { await logRepository.delete(entry) }
             } label: {
-                Label("Delete Scan", systemImage: "trash")
+                Label("Delete Entry", systemImage: "trash")
             }
         }
     }
@@ -140,39 +137,24 @@ struct VideoView: View {
                 importFailed = true
                 return
             }
-            logScan(durationSeconds: await video.durationSeconds(), videoURL: video.url)
-        }
-    }
-
-    /// Analyzes poses, scores the form, and records the scan.
-    private func logScan(durationSeconds: Int, videoURL: URL?) {
-        Task {
-            isScoring = true
-            defer { isScoring = false }
-            var frames: [PoseFrame] = []
-            if let videoURL {
-                frames = (try? await PoseAnalyzer.analyze(videoURL: videoURL)) ?? []
-            }
-            let result = FormScorer.score(frames: frames)
-            await scanRepository.addScan(
-                category: result.category,
-                formScore: result.score,
-                durationSeconds: durationSeconds,
-                breakdown: result.breakdown,
-                videoTempURL: videoURL,
-                poseFrames: frames
-            )
+            pendingVideo = PendingVideo(url: video.url, durationSeconds: await video.durationSeconds())
         }
     }
 }
 
-private struct PlayingSessionID: Identifiable {
+private struct PendingVideo: Identifiable {
+    let id = UUID()
+    let url: URL
+    let durationSeconds: Int
+}
+
+private struct EntryIDWrapper: Identifiable {
     let id: UUID
 }
 
 #Preview {
     NavigationStack {
-        VideoView()
+        TrainingLogView()
     }
-    .environmentObject(ScanRepository())
+    .environmentObject(LogRepository())
 }

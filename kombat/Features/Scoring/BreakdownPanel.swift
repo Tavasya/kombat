@@ -9,8 +9,8 @@ import SwiftUI
 /// tappable findings that seek the video to the moment form broke down.
 struct BreakdownPanel: View {
     let score: Int
-    let breakdown: ScanBreakdown
-    let coaching: ScanCoaching?
+    let breakdown: AnalysisBreakdown
+    let coaching: AnalysisCoaching?
     let onSeek: (Double) -> Void
 
     var body: some View {

@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct FocusAreaCard: View {
-    let category: ScanRepository.CategoryAverage
+    let category: LogRepository.CategoryAverage
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {

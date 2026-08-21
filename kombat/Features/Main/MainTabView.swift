@@ -13,7 +13,7 @@ enum MainTab {
 
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .home
-    @StateObject private var scanRepository = ScanRepository()
+    @StateObject private var logRepository = LogRepository()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -26,10 +26,10 @@ struct MainTabView: View {
             .tag(MainTab.home)
 
             NavigationStack {
-                VideoView()
+                TrainingLogView()
             }
             .tabItem {
-                Label("Video", systemImage: "camera.fill")
+                Label("Log", systemImage: "camera.fill")
             }
             .tag(MainTab.video)
 
@@ -42,8 +42,8 @@ struct MainTabView: View {
             .tag(MainTab.stats)
         }
         .tint(Theme.Colors.accent)
-        .environmentObject(scanRepository)
-        .task { await scanRepository.load() }
+        .environmentObject(logRepository)
+        .task { await logRepository.load() }
     }
 }
 

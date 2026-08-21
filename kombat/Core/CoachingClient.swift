@@ -10,15 +10,15 @@ import Supabase
 /// metrics into coaching prose. Never sends video or pose data — just the
 /// category scores, their supporting metrics, and flagged findings.
 enum CoachingClient {
-    static func generate(from breakdown: ScanBreakdown) async throws -> ScanCoaching {
+    static func generate(from breakdown: AnalysisBreakdown) async throws -> AnalysisCoaching {
         guard let categories = breakdown.categories, !categories.isEmpty else {
             throw CoachingError.noCategories
         }
 
         struct RequestBody: Encodable {
             let repCount: Int
-            let categories: [ScanBreakdown.CategoryReport]
-            let findings: [ScanBreakdown.Finding]
+            let categories: [AnalysisBreakdown.CategoryReport]
+            let findings: [AnalysisBreakdown.Finding]
         }
 
         let body = RequestBody(repCount: breakdown.repCount, categories: categories, findings: breakdown.findings)
@@ -27,7 +27,7 @@ enum CoachingClient {
         return try await SupabaseService.client.functions.invoke(
             "coach-feedback",
             options: FunctionInvokeOptions(body: data),
-            decode: { data, _ in try JSONDecoder().decode(ScanCoaching.self, from: data) }
+            decode: { data, _ in try JSONDecoder().decode(AnalysisCoaching.self, from: data) }
         )
     }
 

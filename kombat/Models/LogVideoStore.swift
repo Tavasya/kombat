@@ -1,14 +1,14 @@
 //
-//  ScanVideoStore.swift
+//  LogVideoStore.swift
 //  kombat
 //
 
 import Foundation
 
-/// Permanent on-device home for scan videos. Files live in Application
-/// Support (which survives restarts, unlike tmp); the database row stores
-/// only the file name.
-enum ScanVideoStore {
+/// Permanent on-device home for logged session videos. Files live in
+/// Application Support (which survives restarts, unlike tmp); the database
+/// row stores only the file name.
+enum LogVideoStore {
     static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir = base.appendingPathComponent("Scans", isDirectory: true)

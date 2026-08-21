@@ -1,5 +1,5 @@
 //
-//  ScanCoaching.swift
+//  AnalysisCoaching.swift
 //  kombat
 //
 
@@ -7,7 +7,7 @@ import Foundation
 
 /// LLM-generated coaching prose, one entry per category. Derived entirely
 /// from the engine's measured metrics — the model never sees video or poses.
-struct ScanCoaching: Codable, Equatable {
+struct AnalysisCoaching: Codable, Equatable {
     let categories: [CategoryNote]
 
     struct CategoryNote: Codable, Equatable, Identifiable {
