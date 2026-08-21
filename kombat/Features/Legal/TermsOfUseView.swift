@@ -30,8 +30,16 @@ struct TermsOfUseView: View {
                     body: "Kombat provides automated technique feedback for informational purposes only and is not a substitute for professional coaching or medical advice. Train at your own risk."
                 )
                 legalSection(
+                    title: "Disputes & Liability",
+                    body: "To the fullest extent permitted by law, our liability to you is limited to the lesser of what you paid us in the past 12 months or $20 USD. Disputes are resolved through binding individual arbitration rather than in court, except for claims involving intellectual property or injunctive relief."
+                )
+                legalSection(
                     title: "Changes",
                     body: "We may update these terms from time to time. Continued use of the app after changes constitutes acceptance of the updated terms."
+                )
+                legalSection(
+                    title: "Contact",
+                    body: "Questions about these terms can be directed to ordonez.rex1@gmail.com. The full terms are also available at kombat-website.vercel.app/terms."
                 )
             }
             .padding(Theme.Spacing.lg)
