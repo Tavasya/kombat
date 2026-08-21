@@ -15,15 +15,27 @@ struct PrivacyPolicyView: View {
 
                 legalSection(
                     title: "Information We Collect",
-                    body: "When you create an account, we collect your email address. When you record or upload a scan, we store the video on your device and the resulting form-analysis data (score, technique breakdown, timestamps) in our database, associated with your account."
+                    body: "When you create an account, we collect your email address (and your name, if you sign in with Apple). When you record or upload a scan, we store the video locally on your device and send only the resulting form-analysis data (score, technique breakdown, timestamps) to our database."
                 )
                 legalSection(
                     title: "How We Use Your Information",
-                    body: "We use your data to provide the app's core features: analyzing your training form, tracking your progress over time, and managing your subscription. We do not sell your personal data."
+                    body: "We use your data to provide the app's core features: analyzing your training form, tracking your progress over time, and managing your subscription. We do not sell your personal data or collect information about you from third parties."
+                )
+                legalSection(
+                    title: "AI-Powered Coaching",
+                    body: "Your scan's measured scores and metrics (never the video itself or raw pose data) are sent to OpenAI to generate written coaching feedback. To opt out, contact us using the email below."
+                )
+                legalSection(
+                    title: "Social Login",
+                    body: "If you sign in with Apple, we receive your name and email from Apple to create your account. We don't offer any other third-party login."
                 )
                 legalSection(
                     title: "Third-Party Services",
                     body: "We use Supabase for authentication and data storage, and Apple's App Store for subscription billing. Payment information is handled entirely by Apple; we never see or store your payment details."
+                )
+                legalSection(
+                    title: "Video Storage",
+                    body: "Videos you record or upload are stored locally on your device and are never uploaded to our servers. They're only viewable on the device that captured or imported them."
                 )
                 legalSection(
                     title: "Data Retention & Deletion",
@@ -31,7 +43,7 @@ struct PrivacyPolicyView: View {
                 )
                 legalSection(
                     title: "Contact",
-                    body: "Questions about this policy can be directed to the app developer."
+                    body: "Questions about this policy can be directed to ordonez.rex1@gmail.com. The full policy is also available at kombat-website.vercel.app/privacy."
                 )
             }
             .padding(Theme.Spacing.lg)
