@@ -11,12 +11,6 @@ struct StatPoint: Identifiable {
     let score: Double
 }
 
-struct CategoryScore: Identifiable {
-    let id = UUID()
-    let category: StrikeCategory
-    let averageScore: Double
-}
-
 struct WeeklySessionCount: Identifiable {
     let id = UUID()
     let weekLabel: String

@@ -7,7 +7,7 @@ import SwiftUI
 import Charts
 
 struct CategoryBreakdownChart: View {
-    let categories: [CategoryScore]
+    let categories: [ScanRepository.CategoryAverage]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -15,13 +15,13 @@ struct CategoryBreakdownChart: View {
 
             Chart(categories) { category in
                 BarMark(
-                    x: .value("Score", category.averageScore),
-                    y: .value("Category", category.category.rawValue)
+                    x: .value("Score", category.score),
+                    y: .value("Category", category.name)
                 )
-                .foregroundStyle(Color.scoreColor(for: Int(category.averageScore)))
+                .foregroundStyle(Color.scoreColor(for: category.score))
                 .cornerRadius(6)
                 .annotation(position: .trailing) {
-                    Text("\(Int(category.averageScore))")
+                    Text("\(category.score)")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
@@ -40,7 +40,7 @@ struct CategoryBreakdownChart: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
             }
-            .frame(height: 160)
+            .frame(height: CGFloat(categories.count) * 40 + 20)
         }
         .padding(Theme.Spacing.md)
         .cardStyle()

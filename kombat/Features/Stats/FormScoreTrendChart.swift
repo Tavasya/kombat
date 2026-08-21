@@ -37,7 +37,7 @@ struct FormScoreTrendChart: View {
             }
             .chartYScale(domain: 0...100)
             .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: 9)) { _ in
+                AxisMarks(preset: .aligned, values: .automatic(desiredCount: 4)) { _ in
                     AxisGridLine().foregroundStyle(Theme.Colors.cardBorder)
                     AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                         .foregroundStyle(Theme.Colors.textSecondary)
