@@ -3,6 +3,8 @@
 //  kombat
 //
 
+import AuthenticationServices
+import CryptoKit
 import SwiftUI
 
 private enum AuthMode {
@@ -12,6 +14,7 @@ private enum AuthMode {
 
 struct AuthView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var mode: AuthMode = .signUp
     @State private var email = ""
@@ -19,6 +22,7 @@ struct AuthView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var infoMessage: String?
+    @State private var currentAppleNonce: String?
 
     private var isSignUp: Bool { mode == .signUp }
     private var isFormValid: Bool { !email.isEmpty && password.count >= 6 }
@@ -40,6 +44,16 @@ struct AuthView: View {
                     .padding(.top, Theme.Spacing.xl)
 
                     modeToggle
+
+                    signInWithAppleButton
+
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Rectangle().fill(Theme.Colors.cardBorder).frame(height: 1)
+                        Text("or")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                        Rectangle().fill(Theme.Colors.cardBorder).frame(height: 1)
+                    }
 
                     VStack(spacing: Theme.Spacing.md) {
                         AuthTextField(title: "Email", text: $email, keyboardType: .emailAddress, textContentType: .emailAddress)
@@ -96,6 +110,82 @@ struct AuthView: View {
                 .padding(.vertical, 10)
                 .background(isActive ? AnyShapeStyle(Theme.Colors.accentGradient) : AnyShapeStyle(Color.clear), in: Capsule())
         }
+    }
+
+    private var signInWithAppleButton: some View {
+        SignInWithAppleButton(.continue) { request in
+            let nonce = Self.randomNonceString()
+            currentAppleNonce = nonce
+            request.requestedScopes = [.email, .fullName]
+            request.nonce = Self.sha256(nonce)
+        } onCompletion: { result in
+            handleAppleCompletion(result)
+        }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(height: 50)
+        .clipShape(Capsule())
+    }
+
+    private func handleAppleCompletion(_ result: Result<ASAuthorization, Error>) {
+        errorMessage = nil
+        infoMessage = nil
+
+        switch result {
+        case .failure(let error):
+            // User cancelling the sheet shouldn't read as an error.
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            errorMessage = error.localizedDescription
+
+        case .success(let authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let identityTokenData = credential.identityToken,
+                let idToken = String(data: identityTokenData, encoding: .utf8),
+                let nonce = currentAppleNonce
+            else {
+                errorMessage = "Couldn't complete Sign in with Apple."
+                return
+            }
+
+            isLoading = true
+            Task {
+                do {
+                    let session = try await SupabaseService.client.auth.signInWithIdToken(
+                        credentials: .init(provider: .apple, idToken: idToken, nonce: nonce)
+                    )
+                    appState.completeAuth(email: session.user.email ?? "")
+                } catch {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private static func randomNonceString(length: Int = 32) -> String {
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remainingLength = length
+
+        while remainingLength > 0 {
+            var randomBytes = [UInt8](repeating: 0, count: 16)
+            let status = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+            precondition(status == errSecSuccess, "Unable to generate nonce.")
+
+            for byte in randomBytes where remainingLength > 0 {
+                if byte < charset.count {
+                    result.append(charset[Int(byte)])
+                    remainingLength -= 1
+                }
+            }
+        }
+        return result
+    }
+
+    private static func sha256(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .compactMap { String(format: "%02x", $0) }
+            .joined()
     }
 
     private func submit() {
