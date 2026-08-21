@@ -12,7 +12,14 @@ enum PoseAnalyzer {
     /// the skeleton doesn't need more than this to look smooth.
     private static let sampleInterval = 1.0 / 15.0
     private static let confidenceThreshold: Float = 0.3
-    private static let minimumJoints = 4
+    private static let minimumJoints = 6
+    /// Drops anyone whose skeleton is much smaller than the largest person in
+    /// frame — background bystanders read as small, distant detections next
+    /// to the person actually training close to the camera.
+    private static let minRelativeSize: CGFloat = 0.4
+    /// Shadowboxing is one person, sparring is two; beyond that is almost
+    /// certainly background noise, not training partners.
+    private static let maxTrackedPeople = 2
 
     static func analyze(videoURL: URL) async throws -> [PoseFrame] {
         let asset = AVURLAsset(url: videoURL)
@@ -52,7 +59,7 @@ enum PoseAnalyzer {
             try? handler.perform([request])
 
             var detected: [DetectedPose] = []
-            for observation in request.results ?? [] {
+            for observation in request.results ?? [] where observation.confidence > confidenceThreshold {
                 guard let recognized = try? observation.recognizedPoints(.all) else { continue }
                 var joints: [VNHumanBodyPoseObservation.JointName: CGPoint] = [:]
                 for (name, point) in recognized where point.confidence > confidenceThreshold {
@@ -63,11 +70,43 @@ enum PoseAnalyzer {
                     detected.append(DetectedPose(joints: joints, imageAspect: imageAspect))
                 }
             }
-            if !detected.isEmpty {
-                frames.append(PoseFrame(time: time, poses: tracker.assign(detected)))
+            let subjects = mainSubjects(in: detected)
+            if !subjects.isEmpty {
+                frames.append(PoseFrame(time: time, poses: tracker.assign(subjects)))
             }
         }
         return frames
+    }
+
+    /// Keeps only the people actually training: drops anyone whose skeleton
+    /// is much smaller than the largest person in frame (background
+    /// bystanders read as small, distant detections), then caps the count at
+    /// `maxTrackedPeople` since training footage is one or two people, never more.
+    private static func mainSubjects(in detected: [DetectedPose]) -> [DetectedPose] {
+        guard detected.count > 1 else { return detected }
+
+        let sized: [(pose: DetectedPose, area: CGFloat)] = detected.map { pose in
+            (pose, boundingBoxArea(pose))
+        }
+        let areas: [CGFloat] = sized.map { $0.area }
+        guard let largest = areas.max(), largest > 0 else { return detected }
+
+        let minArea = largest * minRelativeSize
+        let qualified = sized.filter { $0.area >= minArea }
+        let ranked = qualified.sorted { $0.area > $1.area }
+        return ranked.prefix(maxTrackedPeople).map { $0.pose }
+    }
+
+    /// Fraction of the frame the person's joints span — a proxy for how
+    /// close to the camera (and how prominent) they are.
+    private static func boundingBoxArea(_ pose: DetectedPose) -> CGFloat {
+        let points = pose.joints.values
+        guard !points.isEmpty else { return 0 }
+        let xs = points.map(\.x)
+        let ys = points.map(\.y)
+        guard let minX = xs.min(), let maxX = xs.max(),
+              let minY = ys.min(), let maxY = ys.max() else { return 0 }
+        return (maxX - minX) * (maxY - minY)
     }
 
     /// Gives each detected person a stable ID by matching them to the nearest
